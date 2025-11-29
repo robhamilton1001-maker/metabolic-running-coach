@@ -1,12 +1,14 @@
+import DateTimePicker from '@react-native-community/datetimepicker'; // NEW IMPORT
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Colors from '../constants/colors';
-import { useUser } from '../context/UserContext'; // Import the hook we just created
+import { useUser } from '../context/UserContext';
 
 export default function OnboardingScreen({ navigation }) {
-  const { user, updateUser } = useUser(); // Access global state
+  const { user, updateUser } = useUser();
 
-  // Local state for form inputs (initialized with context defaults)
+  // Local state
+  const [username, setUsername] = useState(user.username || '');
   const [units, setUnits] = useState(user.preferred_unit);
   const [vo2, setVo2] = useState(user.vo2_max.toString());
   const [hrMax, setHrMax] = useState(user.hr_max.toString());
@@ -14,10 +16,20 @@ export default function OnboardingScreen({ navigation }) {
   const [lt2, setLt2] = useState(user.lt2_hr.toString());
   const [days, setDays] = useState(user.availability_days);
   const [duration, setDuration] = useState(user.plan_duration_weeks);
+  
+  // Date State
+  const [date, setDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const onDateChange = (event, selectedDate) => {
+    const currentDate = selectedDate || date;
+    setShowDatePicker(false);
+    setDate(currentDate);
+  };
 
   const handleComplete = () => {
-    // 1. Save all data to the global context
     updateUser({
+      username,
       preferred_unit: units,
       vo2_max: parseFloat(vo2) || 0,
       hr_max: parseFloat(hrMax) || 0,
@@ -25,9 +37,9 @@ export default function OnboardingScreen({ navigation }) {
       lt2_hr: parseFloat(lt2) || 0,
       availability_days: days,
       plan_duration_weeks: duration,
+      start_date: date.toISOString(), // Save date string
     });
 
-    // 2. Navigate to the main app
     navigation.replace('Dashboard');
   };
 
@@ -40,25 +52,40 @@ export default function OnboardingScreen({ navigation }) {
         <Text style={styles.title}>Phase 1: Setup</Text>
         <Text style={styles.subtitle}>Let's calibrate your metabolic profile.</Text>
 
-        {/* 1. Unit Toggle */}
+        {/* Profile & Start Date */}
         <View style={styles.section}>
-          <Text style={styles.label}>Preferred Units</Text>
-          <View style={styles.toggleContainer}>
-            {['metric', 'imperial'].map((u) => (
-              <TouchableOpacity
-                key={u}
-                style={[styles.toggleButton, units === u && styles.toggleActive]}
-                onPress={() => setUnits(u)}
-              >
-                <Text style={[styles.toggleText, units === u && styles.textActive]}>
-                  {u === 'metric' ? 'Kilometers (km)' : 'Miles (mi)'}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          <Text style={styles.label}>Profile</Text>
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>Username</Text>
+            <TextInput
+              style={styles.input}
+              value={username}
+              onChangeText={setUsername}
+              placeholder="RunnerName"
+              placeholderTextColor={Colors.textDim}
+              autoCapitalize="none"
+            />
           </View>
+
+          <Text style={[styles.inputLabel, { marginTop: 12 }]}>Plan Start Date</Text>
+          <TouchableOpacity 
+            style={styles.dateButton} 
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Text style={styles.dateButtonText}>{date.toDateString()}</Text>
+          </TouchableOpacity>
+
+          {showDatePicker && (
+            <DateTimePicker
+              value={date}
+              mode="date"
+              display="default"
+              onChange={onDateChange}
+            />
+          )}
         </View>
 
-        {/* 2. Physiology Inputs */}
+        {/* Physiology Inputs */}
         <View style={styles.section}>
           <Text style={styles.label}>Physiology</Text>
           <View style={styles.inputRow}>
@@ -111,9 +138,9 @@ export default function OnboardingScreen({ navigation }) {
           </View>
         </View>
 
-        {/* 3. Training Availability */}
+        {/* Training Availability */}
         <View style={styles.section}>
-          <Text style={styles.label}>Training Days / Week: {days}</Text>
+          <Text style={styles.label}>Training Days / Week</Text>
           <View style={styles.daysContainer}>
             {[3, 4, 5, 6, 7].map((d) => (
               <TouchableOpacity
@@ -127,7 +154,7 @@ export default function OnboardingScreen({ navigation }) {
           </View>
         </View>
 
-        {/* 4. Plan Duration */}
+        {/* Plan Duration */}
         <View style={styles.section}>
           <Text style={styles.label}>Macrocycle Duration</Text>
           <View style={styles.toggleContainer}>
@@ -139,6 +166,24 @@ export default function OnboardingScreen({ navigation }) {
               >
                 <Text style={[styles.toggleText, duration === w && styles.textActive]}>
                   {w} Weeks
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Unit Toggle */}
+        <View style={styles.section}>
+          <Text style={styles.label}>Preferred Units</Text>
+          <View style={styles.toggleContainer}>
+            {['metric', 'imperial'].map((u) => (
+              <TouchableOpacity
+                key={u}
+                style={[styles.toggleButton, units === u && styles.toggleActive]}
+                onPress={() => setUnits(u)}
+              >
+                <Text style={[styles.toggleText, units === u && styles.textActive]}>
+                  {u === 'metric' ? 'Kilometers (km)' : 'Miles (mi)'}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -273,5 +318,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textTransform: 'uppercase',
     letterSpacing: 1,
+  },
+  // New Date Button Styles
+  dateButton: {
+    backgroundColor: Colors.surface,
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+  },
+  dateButtonText: {
+    color: Colors.textPrimary,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

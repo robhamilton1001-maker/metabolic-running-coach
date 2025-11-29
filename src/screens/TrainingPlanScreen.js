@@ -6,22 +6,30 @@ import { PROGRAM_SCHEDULE } from '../data/dummyProgram';
 export default function TrainingPlanScreen({ navigation }) {
   
   const renderWeekItem = ({ item }) => {
-    // Variables defined strictly before return
-    const isLocked = item.status === 'Locked';
+    // 1. Define status variables
+    // We still track 'Active' for styling, but we ignore 'Locked' for interaction
     const isActive = item.status === 'Active';
-    const statusColor = isActive ? Colors.primary : (isLocked ? Colors.textDim : Colors.success);
-
+    const isComplete = item.status === 'Complete';
+    
+    // 2. Determine color based on status
+    let statusColor = Colors.primary; // Default to Blue
+    if (isComplete) statusColor = Colors.success; // Green if done
+    
     return (
       <TouchableOpacity 
-        disabled={isLocked}
+        // REMOVED: disabled={isLocked} -> Now everyone can click!
         onPress={() => navigation.navigate('WeekDetail', { weekId: item.weekId, title: item.title })}
       >
-        <Card style={isActive ? styles.activeBorder : {}}>
+        <Card style={isActive ? styles.activeCardBorder : {}}>
           <View style={styles.cardHeader}>
-            <Text style={[styles.weekType, { color: statusColor }]}>{item.phase.toUpperCase()}</Text>
+            <Text style={[styles.weekType, { color: statusColor }]}>
+              {item.phase ? item.phase.toUpperCase() : 'TRAINING'}
+            </Text>
+            {/* Show status text, even for future weeks */}
             <Text style={[styles.statusBadge, { color: statusColor }]}>{item.status}</Text>
           </View>
-          <Text style={[styles.weekTitle, isLocked && styles.lockedText]}>{item.title}</Text>
+          {/* REMOVED: lockedText style -> Title is always bright */}
+          <Text style={styles.weekTitle}>{item.title}</Text>
         </Card>
       </TouchableOpacity>
     );

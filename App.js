@@ -11,6 +11,7 @@ import AppLoading from './src/components/AppLoading';
 // Import Screens
 import DashboardScreen from './src/screens/DashboardScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
+import PdfViewerScreen from './src/screens/PdfViewerScreen';
 import PlaceholderScreen from './src/screens/PlaceholderScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import SessionDetailScreen from './src/screens/SessionDetailScreen';
@@ -141,6 +142,11 @@ export default function App() {
             component={StatisticsScreen} 
             options={{ headerShown: false, presentation: 'modal' }} 
           />
+          <Stack.Screen 
+  name="PdfViewer" 
+  component={PdfViewerScreen} 
+  options={{ headerShown: false, presentation: 'modal' }} 
+/>
         </Stack.Navigator>
       </NavigationContainer>
     </UserProvider>

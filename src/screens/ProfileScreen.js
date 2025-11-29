@@ -1,4 +1,4 @@
-import * as ImagePicker from 'expo-image-picker'; // Import the Image Picker
+import * as ImagePicker from 'expo-image-picker';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Card } from '../components/UI/Card';
 import { IconSymbol } from '../components/UI/IconSymbol';
@@ -6,34 +6,47 @@ import Colors from '../constants/colors';
 import { useUser } from '../context/UserContext';
 
 export default function ProfileScreen({ navigation }) {
-  const { user, updateUser } = useUser();
+  const { user, updateUser, program } = useUser();
 
-  // Function to pick an image from the device library
   const pickImage = async () => {
-    // No permissions request is necessary for launching the image library
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'], // Updated to array syntax for newer versions
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 1,
     });
 
     if (!result.canceled) {
-      // Save the new image URI to the global context
       updateUser({ profile_image_url: result.assets[0].uri });
     }
   };
 
-  // Mock Data for Adherence
-  const weeklyAdherence = [1, 1, 0, 1, 1, 0, 1]; 
-  const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  // 1. CALCULATE REAL STATS
+  // Total Completed Runs (All time)
+  const completedRuns = program
+    .flatMap(week => week.days)
+    .filter(day => day.type === 'Run' && day.status === 'Complete')
+    .length;
+
+  // 2. CALCULATE WEEKLY ADHERENCE (For the Active Week)
+  const activeWeek = program.find(w => w.status === 'Active') || program[0];
+  
+  // Map the 7 days of the active week to status (1 = Green/Filled, 0 = Empty)
+  const weeklyAdherence = activeWeek.days.map(day => {
+    // Logic: Rest days count as "adherence" (easy win), Runs only count if Complete
+    if (day.type === 'Rest') return 1;
+    if (day.status === 'Complete') return 1;
+    return 0;
+  });
+
+  // Get Day labels (M, T, W...) from the data
+  const dayLabels = activeWeek.days.map(day => day.day.charAt(0));
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       {/* Header / Profile Info */}
       <View style={styles.header}>
         
-        {/* Clickable Avatar Container */}
         <TouchableOpacity onPress={pickImage} style={styles.avatarContainer}>
           {user.profile_image_url ? (
             <Image source={{ uri: user.profile_image_url }} style={styles.avatarImage} />
@@ -44,7 +57,6 @@ export default function ProfileScreen({ navigation }) {
               </Text>
             </View>
           )}
-          {/* Edit Icon Overlay */}
           <View style={styles.editIconBadge}>
             <IconSymbol name="gear" size={12} color="#fff" />
           </View>
@@ -56,7 +68,7 @@ export default function ProfileScreen({ navigation }) {
           
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>12</Text>
+              <Text style={styles.statValue}>{completedRuns}</Text>
               <Text style={styles.statLabel}>Runs</Text>
             </View>
             <View style={styles.statItem}>
@@ -71,11 +83,13 @@ export default function ProfileScreen({ navigation }) {
         </View>
       </View>
 
-      {/* Adherence Tracker */}
+      {/* Adherence Tracker - NOW DYNAMIC */}
       <Card>
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Weekly Adherence</Text>
-          <Text style={styles.sectionSubtitle}>5/7 Sessions</Text>
+          <Text style={styles.sectionSubtitle}>
+             Week {activeWeek.weekId}
+          </Text>
         </View>
         <View style={styles.adherenceRow}>
           {weeklyAdherence.map((status, index) => (
@@ -84,7 +98,7 @@ export default function ProfileScreen({ navigation }) {
                 styles.adherenceBubble, 
                 status === 1 ? styles.adherenceComplete : styles.adherenceMissed
               ]} />
-              <Text style={styles.dayText}>{days[index]}</Text>
+              <Text style={styles.dayText}>{dayLabels[index]}</Text>
             </View>
           ))}
         </View>
@@ -122,16 +136,17 @@ export default function ProfileScreen({ navigation }) {
       <Text style={styles.sectionHeaderLabel}>MENU</Text>
       <View style={styles.gridContainer}>
         
-        {/* Statistics Button */}
+        {/* 1. Lab Reports (Formerly Statistics) -> Goes to PDF Screen */}
         <TouchableOpacity 
           style={styles.gridButton}
-          onPress={() => navigation.navigate('Statistics')}
+          onPress={() => navigation.navigate('PdfViewer')}
         >
-          <IconSymbol name="chart.bar.fill" size={24} color={Colors.primary} />
-          <Text style={styles.gridButtonText}>Statistics</Text>
+          {/* Ensure 'doc.text.fill' is in your IconSymbol map, or use 'chart.bar.fill' if you prefer */}
+          <IconSymbol name="doc.text.fill" size={24} color={Colors.primary} />
+          <Text style={styles.gridButtonText}>Lab Reports</Text>
         </TouchableOpacity>
 
-        {/* Benchmarks Button */}
+        {/* 2. Benchmarks -> Goes to Statistics/PB Screen */}
         <TouchableOpacity 
           style={styles.gridButton}
           onPress={() => navigation.navigate('Statistics')}
@@ -140,7 +155,7 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.gridButtonText}>Benchmarks</Text>
         </TouchableOpacity>
 
-        {/* Settings Button */}
+        {/* 3. Settings */}
         <TouchableOpacity 
           style={styles.gridButton}
           onPress={() => navigation.navigate('Settings')}
@@ -150,7 +165,6 @@ export default function ProfileScreen({ navigation }) {
         </TouchableOpacity>
 
       </View>
-
     </ScrollView>
   );
 }
@@ -159,8 +173,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  scrollContent: {
     padding: 20,
     paddingTop: 60,
+    paddingBottom: 120, 
   },
   header: {
     flexDirection: 'row',

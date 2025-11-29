@@ -17,6 +17,8 @@ const MAPPING = {
   'gear': 'settings',
   'arrow.clockwise': 'refresh',
   'ellipsis': 'more-horiz',
+  'checkmark.circle.fill': 'check-circle',
+  'doc.text.fill': 'description',
   
   // Profile & Stats
   'chart.bar.fill': 'bar-chart',
