@@ -1,45 +1,102 @@
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Card } from '../components/UI/Card';
+import { IconSymbol } from '../components/UI/IconSymbol';
 import Colors from '../constants/colors';
+import { useUser } from '../context/UserContext';
+import { getCurrentWeek } from '../data/dummyProgram'; // Import our new data source
 
 export default function DashboardScreen({ navigation }) {
-  // Mock Data for Progress
-  const progress = 0.35; // 35% through the block
+  // 1. Get User Data (Fix for the error)
+  const { user } = useUser(); 
+
+  // 2. Get the Active Week Data
+  const activeWeek = getCurrentWeek();
+  
+  // 3. State to track which day is selected
+  const [selectedDay, setSelectedDay] = useState(activeWeek.days[2]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      {/* Header */}
       <View style={styles.headerRow}>
         <Text style={styles.headerTitle}>HOME</Text>
         <IconSymbol name="bell" size={24} color={Colors.textPrimary} />
       </View>
 
-      {/* Plan Progress Card */}
-      <View style={styles.progressCard}>
+      {/* Weekly Calendar Strip (Keep as is) */}
+      <View style={styles.calendarContainer}>
+        <Text style={styles.sectionTitle}>WEEK {activeWeek.weekId} • {activeWeek.phase.toUpperCase()}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.calendarScroll}>
+          {activeWeek.days.map((day) => {
+            const isSelected = selectedDay.id === day.id;
+            const isComplete = day.status === 'Complete';
+            
+            return (
+              <TouchableOpacity 
+                key={day.id} 
+                style={[
+                  styles.dayCard, 
+                  isSelected && styles.dayCardSelected,
+                  isComplete && !isSelected && styles.dayCardComplete
+                ]}
+                onPress={() => setSelectedDay(day)}
+              >
+                <Text style={[styles.dayName, isSelected && styles.textSelected]}>{day.day}</Text>
+                <Text style={[styles.dateNumber, isSelected && styles.textSelected]}>{day.date}</Text>
+                
+                <View style={[
+                  styles.statusDot, 
+                  { backgroundColor: isComplete ? Colors.success : (isSelected ? Colors.background : 'transparent') }
+                ]} />
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* Plan Progress Card -> Now using Premium Card */}
+      <Card>
         <View style={styles.progressHeader}>
           <Text style={styles.cardLabel}>CURRENT BLOCK PROGRESS</Text>
-          <Text style={styles.progressPercent}>{Math.round(progress * 100)}%</Text>
+          <Text style={styles.progressPercent}>35%</Text>
         </View>
         <View style={styles.progressBarBackground}>
-          <View style={[styles.progressBarFill, { width: `${progress * 100}%` }]} />
+          <View style={[styles.progressBarFill, { width: '35%' }]} />
         </View>
-        <Text style={styles.cardSubtext}>Week 4 of 12 • Base Building</Text>
-      </View>
+        <Text style={styles.cardSubtext}>Week {activeWeek.weekId} of {user.plan_duration_weeks} • {activeWeek.phase}</Text>
+      </Card>
 
-      {/* Next Session Card (Running Focus) */}
-      <View style={[styles.card, { borderLeftColor: Colors.primary }]}>
+      {/* Session Card -> Now using Premium Card with border accent */}
+      <Card style={{ 
+        borderLeftWidth: 4, 
+        borderLeftColor: selectedDay.type === 'Rest' ? Colors.textDim : Colors.primary 
+      }}>
         <View style={styles.cardHeaderRow}>
-          <Text style={styles.cardLabel}>TODAY'S RUN</Text>
-          <Text style={styles.cardTag}>AEROBIC BASE</Text>
+          <Text style={styles.cardLabel}>
+            {selectedDay.date === 27 ? "TODAY'S SESSION" : `${selectedDay.day.toUpperCase()} ${selectedDay.date}`}
+          </Text>
+          <Text style={[styles.cardTag, { color: selectedDay.type === 'Rest' ? Colors.textDim : Colors.primary }]}>
+            {selectedDay.type.toUpperCase()}
+          </Text>
         </View>
         
-        <Text style={styles.sessionTitle}>5k Zone 2 Run</Text>
-        <Text style={styles.sessionDetail}>Target HR: 135-145 bpm</Text>
-        <Text style={styles.sessionDetail}>Steady pace, focus on breathing.</Text>
+        <Text style={styles.sessionTitle}>{selectedDay.title}</Text>
+        <Text style={styles.sessionDetail}>Duration: {selectedDay.duration}</Text>
+        <Text style={styles.sessionDetail}>Status: {selectedDay.status}</Text>
 
-        <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('WorkoutDetail')}>
-          <Text style={styles.actionButtonText}>Start Run</Text>
-        </TouchableOpacity>
-      </View>
+        {selectedDay.type === 'Run' && (
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={() => navigation.navigate('SessionDetail', {
+              workoutTitle: selectedDay.title,
+              targetDuration: selectedDay.duration
+            })}
+          >
+            <Text style={styles.actionButtonText}>Start Run</Text>
+          </TouchableOpacity>
+        )}
+      </Card>
     </ScrollView>
   );
 }
@@ -57,7 +114,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 20,
   },
   headerTitle: {
     color: Colors.textPrimary,
@@ -65,43 +122,58 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.5,
   },
-  // Progress Card Styles
-  progressCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 20,
+  // Calendar Styles
+  calendarContainer: {
     marginBottom: 24,
+  },
+  sectionTitle: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  calendarScroll: {
+    gap: 12, // Space between days
+  },
+  dayCard: {
+    width: 60,
+    height: 80,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
+  dayCardSelected: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
-  progressPercent: {
+  dayCardComplete: {
+    borderColor: Colors.success,
+    borderWidth: 1,
+  },
+  dayName: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    marginBottom: 4,
+    fontWeight: '600',
+  },
+  dateNumber: {
     color: Colors.textPrimary,
+    fontSize: 18,
     fontWeight: 'bold',
   },
-  progressBarBackground: {
-    height: 8,
-    backgroundColor: Colors.surfaceLight,
-    borderRadius: 4,
-    marginBottom: 12,
-    overflow: 'hidden',
+  textSelected: {
+    color: Colors.background, // Dark text on the selected (bright) card
   },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: Colors.primary,
-    borderRadius: 4,
-  },
-  // Standard Card Styles
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 24,
-    borderLeftWidth: 4,
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 6,
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -117,24 +189,19 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   cardTag: {
-    color: Colors.primary,
     fontSize: 12,
     fontWeight: 'bold',
     textTransform: 'uppercase',
   },
-  cardSubtext: {
-    color: Colors.textDim,
-    fontSize: 14,
-  },
   sessionTitle: {
     color: Colors.textPrimary,
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 8,
   },
   sessionDetail: {
     color: Colors.textSecondary,
-    fontSize: 14,
+    fontSize: 16,
     marginBottom: 4,
   },
   actionButton: {
@@ -142,7 +209,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 24,
   },
   actionButtonText: {
     color: Colors.background,

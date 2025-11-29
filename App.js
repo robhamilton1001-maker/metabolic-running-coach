@@ -4,6 +4,9 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
+import { UserProvider } from './src/context/UserContext';
+
+
 
 // Import Components
 import AppLoading from './src/components/AppLoading';
@@ -11,9 +14,13 @@ import AppLoading from './src/components/AppLoading';
 // Import Screens
 import DashboardScreen from './src/screens/DashboardScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
+import PlaceholderScreen from './src/screens/PlaceholderScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
-import ProgramOverviewScreen from './src/screens/ProgramOverviewScreen';
-import WeekDetailScreen from './src/screens/WeekDetailScreen'; // <--- New Import
+import SessionDetailScreen from './src/screens/SessionDetailScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
+import StatisticsScreen from './src/screens/StatisticsScreen';
+import TrainingPlanScreen from './src/screens/TrainingPlanScreen';
+import WeekDetailScreen from './src/screens/WeekDetailScreen';
 
 // Import Theme
 import Colors from './src/constants/colors';
@@ -52,14 +59,11 @@ function MainTabs() {
         }}
       />
       <Tab.Screen 
-        name="Workout" 
-        component={ProgramOverviewScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            // CHANGED: 'fitness-center' -> 'directions-run'
-            <MaterialIcons name="directions-run" size={28} color={color} />
-          ),
-        }}
+      name="Workout" 
+      component={TrainingPlanScreen} // Point to new file
+      options={{
+      tabBarIcon: ({ color }) => <MaterialIcons name="directions-run" size={28} color={color} />,
+      }}
       />
       <Tab.Screen 
         name="Profile" 
@@ -91,29 +95,51 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer>
-      <StatusBar style="light" />
-      <Stack.Navigator 
-        screenOptions={{ 
-          headerStyle: { backgroundColor: Colors.background },
-          headerTintColor: Colors.primary,
-          contentStyle: { backgroundColor: Colors.background },
-          headerShown: false 
-        }}
-      >
-        {/* Onboarding Flow */}
-        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-        
-        {/* Main App Flow (Tabs) */}
-        <Stack.Screen name="Dashboard" component={MainTabs} /> 
-        
-        {/* Drill-Down Screens (These sit on top of the tabs) */}
-        <Stack.Screen 
-          name="WeekDetail" 
-          component={WeekDetailScreen} 
-          options={{ headerShown: false }} // We are using a custom header in the screen itself
+    <UserProvider>
+      <NavigationContainer>
+        <StatusBar style="light" />
+        <Stack.Navigator 
+          screenOptions={{ 
+            headerStyle: { backgroundColor: Colors.background },
+            headerTintColor: Colors.primary,
+            contentStyle: { backgroundColor: Colors.background },
+            headerShown: false 
+          }}
+        >
+          {/* Onboarding Flow */}
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+          
+          {/* Main App Flow (Tabs) */}
+          <Stack.Screen name="Dashboard" component={MainTabs} /> 
+          
+          {/* Drill-Down Screens */}
+          <Stack.Screen 
+            name="WeekDetail" 
+            component={WeekDetailScreen} 
+            options={{ headerShown: false }} 
+          />
+          <Stack.Screen 
+  name="SessionDetail" // New Name
+  component={SessionDetailScreen} 
+  options={{ headerShown: false, presentation: 'modal' }} // 'modal' slides it up nicely!
+/>
+          <Stack.Screen 
+            name="Placeholder" 
+            component={PlaceholderScreen} 
+            options={{ headerShown: false }} 
+          />
+          <Stack.Screen 
+          name="Settings" 
+          component={SettingsScreen} 
+          options={{ headerShown: false }} 
         />
-      </Stack.Navigator>
-    </NavigationContainer>
+        <Stack.Screen 
+          name="Statistics" 
+          component={StatisticsScreen} 
+          options={{ headerShown: false }} 
+        />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </UserProvider>
   );
 }

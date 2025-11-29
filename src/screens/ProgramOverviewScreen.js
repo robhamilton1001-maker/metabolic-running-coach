@@ -1,33 +1,33 @@
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Card } from '../components/UI/Card';
 import Colors from '../constants/colors';
-
-// Mock Data: The structure of a metabolic program
-const PROGRAM_WEEKS = [
-  { id: '1', title: 'Week 1: Aerobic Foundation', status: 'Complete', type: 'Base' },
-  { id: '2', title: 'Week 2: Aerobic Foundation', status: 'Active', type: 'Base' },
-  { id: '3', title: 'Week 3: Metabolic Efficiency', status: 'Locked', type: 'Build' },
-  { id: '4', title: 'Week 4: Recovery & Adaptation', status: 'Locked', type: 'Recovery' },
-];
+import { PROGRAM_SCHEDULE } from '../data/dummyProgram';
 
 export default function ProgramOverviewScreen({ navigation }) {
   
   const renderWeekItem = ({ item }) => {
-    // Determine styling based on status
+    // 1. Define status checks clearly at the start
     const isLocked = item.status === 'Locked';
     const isActive = item.status === 'Active';
-    const statusColor = isActive ? Colors.primary : (isLocked ? Colors.textDim : Colors.success);
+    
+    // 2. Determine color based on status
+    let statusColor = Colors.success; // Default to green (Complete)
+    if (isActive) statusColor = Colors.primary; // Blue/Cyan for Active
+    if (isLocked) statusColor = Colors.textDim; // Grey for Locked
 
     return (
       <TouchableOpacity 
-        style={[styles.weekCard, isActive && styles.activeCard]}
         disabled={isLocked}
-        onPress={() => navigation.navigate('WeekDetail', { weekTitle: item.title })}
+        onPress={() => navigation.navigate('WeekDetail', { weekId: item.weekId, title: item.title })}
       >
-        <View style={styles.cardHeader}>
-          <Text style={[styles.weekType, { color: statusColor }]}>{item.type.toUpperCase()}</Text>
-          <Text style={[styles.statusBadge, { color: statusColor }]}>{item.status}</Text>
-        </View>
-        <Text style={[styles.weekTitle, isLocked && styles.lockedText]}>{item.title}</Text>
+        {/* We use the variables we just defined above */}
+        <Card style={isActive ? styles.activeCardBorder : {}}>
+          <View style={styles.cardHeader}>
+            <Text style={[styles.weekType, { color: statusColor }]}>{item.phase ? item.phase.toUpperCase() : 'TRAINING'}</Text>
+            <Text style={[styles.statusBadge, { color: statusColor }]}>{item.status}</Text>
+          </View>
+          <Text style={[styles.weekTitle, isLocked && styles.lockedText]}>{item.title}</Text>
+        </Card>
       </TouchableOpacity>
     );
   };
@@ -36,9 +36,9 @@ export default function ProgramOverviewScreen({ navigation }) {
     <View style={styles.container}>
       <Text style={styles.headerTitle}>MACROCYCLE</Text>
       <FlatList
-        data={PROGRAM_WEEKS}
+        data={PROGRAM_SCHEDULE}
         renderItem={renderWeekItem}
-        keyExtractor={item => item.id}
+        keyExtractor={item => item.weekId.toString()}
         contentContainerStyle={styles.listContent}
       />
     </View>
@@ -63,17 +63,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 40,
   },
-  weekCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  activeCard: {
+  activeCardBorder: {
     borderColor: Colors.primary,
-    backgroundColor: Colors.surfaceLight,
+    borderWidth: 1,
   },
   cardHeader: {
     flexDirection: 'row',
