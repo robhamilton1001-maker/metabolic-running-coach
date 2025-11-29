@@ -23,8 +23,9 @@ export default function SessionDetailScreen({ navigation, route }) {
           <Text style={styles.label}>WORKOUT</Text>
           <Text style={styles.title}>{workoutTitle}</Text>
           <View style={styles.row}>
-            <IconSymbol name="fitness-center" size={20} color={Colors.textSecondary} />
-            <Text style={styles.detail}>{targetDuration}</Text>
+          {/* CHANGED: Dumbbell -> Stopwatch */}
+          <IconSymbol name="stopwatch" size={20} color={Colors.textSecondary} />
+          <Text style={styles.detail}>{targetDuration}</Text>
           </View>
         </Card>
 

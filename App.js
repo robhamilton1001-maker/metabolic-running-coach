@@ -1,12 +1,9 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { UserProvider } from './src/context/UserContext';
-
-
 
 // Import Components
 import AppLoading from './src/components/AppLoading';
@@ -24,11 +21,24 @@ import WeekDetailScreen from './src/screens/WeekDetailScreen';
 
 // Import Theme
 import Colors from './src/constants/colors';
+import { UserProvider } from './src/context/UserContext';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// 1. Define the Bottom Tab Navigator (The Main App)
+// 2. UPDATED THEME: Extend DarkTheme
+const NavTheme = {
+  ...DarkTheme, // Use DarkTheme as the base
+  colors: {
+    ...DarkTheme.colors,
+    background: Colors.background, // #050505
+    card: Colors.surface,          // #121212 (Used for headers/tab bars)
+    text: Colors.textPrimary,      // #FFFFFF
+    border: Colors.border,         // #333333
+    primary: Colors.primary,       // #00E0FF
+  },
+};
+
 function MainTabs() {
   return (
     <Tab.Navigator
@@ -53,37 +63,31 @@ function MainTabs() {
         name="Home" 
         component={DashboardScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="home" size={28} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <MaterialIcons name="home" size={28} color={color} />,
         }}
       />
       <Tab.Screen 
-      name="Workout" 
-      component={TrainingPlanScreen} // Point to new file
-      options={{
-      tabBarIcon: ({ color }) => <MaterialIcons name="directions-run" size={28} color={color} />,
-      }}
+        name="Workout" 
+        component={TrainingPlanScreen}
+        options={{
+          tabBarIcon: ({ color }) => <MaterialIcons name="directions-run" size={28} color={color} />,
+        }}
       />
       <Tab.Screen 
         name="Profile" 
         component={ProfileScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="person" size={28} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <MaterialIcons name="person" size={28} color={color} />,
         }}
       />
     </Tab.Navigator>
   );
 }
 
-// 2. Define the Root Stack
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate app initialization
     const timer = setTimeout(() => {
       setIsLoading(false);
     }, 2500);
@@ -96,7 +100,8 @@ export default function App() {
 
   return (
     <UserProvider>
-      <NavigationContainer>
+      {/* 3. Pass the Dark Theme */}
+      <NavigationContainer theme={NavTheme}>
         <StatusBar style="light" />
         <Stack.Navigator 
           screenOptions={{ 
@@ -106,38 +111,36 @@ export default function App() {
             headerShown: false 
           }}
         >
-          {/* Onboarding Flow */}
           <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-          
-          {/* Main App Flow (Tabs) */}
           <Stack.Screen name="Dashboard" component={MainTabs} /> 
           
-          {/* Drill-Down Screens */}
           <Stack.Screen 
             name="WeekDetail" 
             component={WeekDetailScreen} 
             options={{ headerShown: false }} 
           />
           <Stack.Screen 
-  name="SessionDetail" // New Name
-  component={SessionDetailScreen} 
-  options={{ headerShown: false, presentation: 'modal' }} // 'modal' slides it up nicely!
-/>
+            name="SessionDetail" 
+            component={SessionDetailScreen} 
+            options={{ headerShown: false, presentation: 'modal' }} 
+          />
+
+          {/* Modals */}
           <Stack.Screen 
             name="Placeholder" 
             component={PlaceholderScreen} 
-            options={{ headerShown: false }} 
+            options={{ headerShown: false, presentation: 'modal' }} 
           />
           <Stack.Screen 
-          name="Settings" 
-          component={SettingsScreen} 
-          options={{ headerShown: false }} 
-        />
-        <Stack.Screen 
-          name="Statistics" 
-          component={StatisticsScreen} 
-          options={{ headerShown: false }} 
-        />
+            name="Settings" 
+            component={SettingsScreen} 
+            options={{ headerShown: false, presentation: 'modal' }} 
+          />
+          <Stack.Screen 
+            name="Statistics" 
+            component={StatisticsScreen} 
+            options={{ headerShown: false, presentation: 'modal' }} 
+          />
         </Stack.Navigator>
       </NavigationContainer>
     </UserProvider>

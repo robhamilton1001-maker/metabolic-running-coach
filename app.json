@@ -1,12 +1,13 @@
 {
   "expo": {
-    "name": "metabolic-coach",
-    "slug": "metabolic-coach",
+    "name": "POA Running Coach",
+    "slug": "poa-running-coach",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "metaboliccoach",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#050505",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true

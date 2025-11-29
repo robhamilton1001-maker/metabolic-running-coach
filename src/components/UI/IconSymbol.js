@@ -7,6 +7,7 @@ const MAPPING = {
   'person': 'person',
   'fitness-center': 'fitness-center',
   'calendar': 'calendar-today',
+  'stopwatch': 'timer',
   'chevron.left': 'chevron-left',
   'chevron.right': 'chevron-right',
   'chevron.down': 'keyboard-arrow-down',
