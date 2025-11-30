@@ -1,6 +1,8 @@
 import * as DocumentPicker from 'expo-document-picker';
-import * as Sharing from 'expo-sharing'; // <--- NEW IMPORT
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native'; // Removed Linking
+import * as FileSystem from 'expo-file-system';
+import * as IntentLauncher from 'expo-intent-launcher';
+import * as Sharing from 'expo-sharing';
+import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Card } from '../components/UI/Card';
 import { IconSymbol } from '../components/UI/IconSymbol';
 import Colors from '../constants/colors';
@@ -24,6 +26,7 @@ export default function PdfViewerScreen({ navigation }) {
         Alert.alert("Success", "Report saved to your profile.");
       }
     } catch (err) {
+      console.log("Pick Error:", err);
       Alert.alert("Error", "Could not select document.");
     }
   };
@@ -31,20 +34,47 @@ export default function PdfViewerScreen({ navigation }) {
   const viewDocument = async () => {
     if (!user.report_pdf_uri) return;
 
-    if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(user.report_pdf_uri, {
-            mimeType: 'application/pdf',
-            dialogTitle: 'Open PDF with...', // Android prompt title
-            UTI: 'com.adobe.pdf' // iOS hint
-        });
-    } else {
-        Alert.alert("Error", "Sharing is not available on this device.");
+    try {
+      if (Platform.OS === 'android') {
+        // 1. Get the Content URI (Required for Android 11+)
+        const contentUri = await FileSystem.getContentUriAsync(user.report_pdf_uri);
+        
+        // 2. Try to launch the specific "VIEW" intent
+        try {
+          await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+            data: contentUri,
+            flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+            type: 'application/pdf',
+          });
+        } catch (e) {
+          // 3. FALLBACK: If VIEW fails (no PDF app), force the Share sheet
+          console.log("View failed, falling back to Share:", e);
+          await Sharing.shareAsync(user.report_pdf_uri, {
+             mimeType: 'application/pdf',
+             dialogTitle: 'Open PDF',
+             UTI: 'com.adobe.pdf'
+          });
+        }
+      } 
+      else {
+        // iOS Standard Behavior
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(user.report_pdf_uri, {
+              mimeType: 'application/pdf',
+              UTI: 'com.adobe.pdf'
+          });
+        } else {
+          Alert.alert("Error", "Sharing not available on this device.");
+        }
+      }
+    } catch (e) {
+      console.log("Final Error:", e);
+      Alert.alert("Error", "Could not open the file. Please ensure you have a PDF Viewer (like Google Drive) installed.");
     }
   };
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <IconSymbol name="chevron.left" size={28} color={Colors.primary} />
@@ -56,7 +86,6 @@ export default function PdfViewerScreen({ navigation }) {
       <View style={styles.content}>
         <Text style={styles.sectionTitle}>Metabolic Testing</Text>
         
-        {/* Document Card */}
         <Card style={styles.docCard}>
           {user.report_pdf_uri ? (
             <View style={styles.uploadedState}>
@@ -67,9 +96,8 @@ export default function PdfViewerScreen({ navigation }) {
               </Text>
               <Text style={styles.fileInfo}>Ready for Review</Text>
               
-              {/* View Button */}
               <TouchableOpacity style={styles.viewButton} onPress={viewDocument}>
-                <Text style={styles.viewButtonText}>Open / Share PDF</Text>
+                <Text style={styles.viewButtonText}>Open Report</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.replaceButton} onPress={pickDocument}>
@@ -78,7 +106,6 @@ export default function PdfViewerScreen({ navigation }) {
             </View>
           ) : (
             <View style={styles.emptyState}>
-              {/* Ensure you have 'doc.text.fill' mapped in IconSymbol, or use 'doc' */}
               <IconSymbol name="doc.text.fill" size={48} color={Colors.textDim} />
               <Text style={styles.emptyTitle}>No Report Uploaded</Text>
               <Text style={styles.emptyText}>
@@ -96,105 +123,22 @@ export default function PdfViewerScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    paddingTop: 60,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  headerTitle: {
-    color: Colors.textPrimary,
-    fontSize: 16,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
-  content: {
-    padding: 20,
-  },
-  sectionTitle: {
-    color: Colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  docCard: {
-    minHeight: 300,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderStyle: 'dashed', 
-  },
-  emptyState: {
-    alignItems: 'center',
-    gap: 12,
-  },
-  emptyTitle: {
-    color: Colors.textPrimary,
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 8,
-  },
-  emptyText: {
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
-    maxWidth: 250,
-    marginBottom: 20,
-  },
-  uploadButton: {
-    backgroundColor: Colors.surfaceLight,
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-  },
-  uploadButtonText: {
-    color: Colors.primary,
-    fontWeight: 'bold',
-  },
-  uploadedState: {
-    alignItems: 'center',
-    gap: 10,
-    width: '100%',
-  },
-  fileName: {
-    color: Colors.textPrimary,
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  fileInfo: {
-    color: Colors.textDim,
-    fontSize: 14,
-    marginBottom: 16,
-  },
-  viewButton: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 14,
-    width: '80%',
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  viewButtonText: {
-    color: Colors.background,
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  replaceButton: {
-    padding: 10,
-  },
-  replaceText: {
-    color: Colors.textSecondary,
-    textDecorationLine: 'underline',
-  },
+  container: { flex: 1, backgroundColor: Colors.background, paddingTop: 60 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 20 },
+  headerTitle: { color: Colors.textPrimary, fontSize: 16, fontWeight: 'bold', letterSpacing: 1 },
+  content: { padding: 20 },
+  sectionTitle: { color: Colors.textSecondary, fontSize: 12, fontWeight: '700', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 },
+  docCard: { minHeight: 300, justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed' },
+  emptyState: { alignItems: 'center', gap: 12 },
+  emptyTitle: { color: Colors.textPrimary, fontSize: 18, fontWeight: 'bold', marginTop: 8 },
+  emptyText: { color: Colors.textSecondary, textAlign: 'center', lineHeight: 20, maxWidth: 250, marginBottom: 20 },
+  uploadButton: { backgroundColor: Colors.surfaceLight, paddingVertical: 12, paddingHorizontal: 32, borderRadius: 20, borderWidth: 1, borderColor: Colors.primary },
+  uploadButtonText: { color: Colors.primary, fontWeight: 'bold' },
+  uploadedState: { alignItems: 'center', gap: 10, width: '100%' },
+  fileName: { color: Colors.textPrimary, fontSize: 18, fontWeight: 'bold', marginTop: 8, textAlign: 'center' },
+  fileInfo: { color: Colors.textDim, fontSize: 14, marginBottom: 16 },
+  viewButton: { backgroundColor: Colors.primary, paddingVertical: 14, width: '80%', borderRadius: 12, alignItems: 'center', marginBottom: 10 },
+  viewButtonText: { color: Colors.background, fontWeight: 'bold', fontSize: 16 },
+  replaceButton: { padding: 10 },
+  replaceText: { color: Colors.textSecondary, textDecorationLine: 'underline' },
 });
