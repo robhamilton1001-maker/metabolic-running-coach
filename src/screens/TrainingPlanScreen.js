@@ -1,23 +1,21 @@
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Card } from '../components/UI/Card';
 import Colors from '../constants/colors';
-import { PROGRAM_SCHEDULE } from '../data/dummyProgram';
+import { useUser } from '../context/UserContext'; // <--- Import Context
 
 export default function TrainingPlanScreen({ navigation }) {
+  const { program } = useUser(); // <--- Get REAL program
   
   const renderWeekItem = ({ item }) => {
-    // 1. Define status variables
-    // We still track 'Active' for styling, but we ignore 'Locked' for interaction
+    // Logic: Nothing is locked anymore. All weeks are accessible.
     const isActive = item.status === 'Active';
     const isComplete = item.status === 'Complete';
     
-    // 2. Determine color based on status
-    let statusColor = Colors.primary; // Default to Blue
-    if (isComplete) statusColor = Colors.success; // Green if done
+    let statusColor = Colors.primary; 
+    if (isComplete) statusColor = Colors.success;
     
     return (
       <TouchableOpacity 
-        // REMOVED: disabled={isLocked} -> Now everyone can click!
         onPress={() => navigation.navigate('WeekDetail', { weekId: item.weekId, title: item.title })}
       >
         <Card style={isActive ? styles.activeCardBorder : {}}>
@@ -25,10 +23,11 @@ export default function TrainingPlanScreen({ navigation }) {
             <Text style={[styles.weekType, { color: statusColor }]}>
               {item.phase ? item.phase.toUpperCase() : 'TRAINING'}
             </Text>
-            {/* Show status text, even for future weeks */}
-            <Text style={[styles.statusBadge, { color: statusColor }]}>{item.status}</Text>
+            {/* Display "Open" instead of Locked */}
+            <Text style={[styles.statusBadge, { color: statusColor }]}>
+              {item.status === 'Locked' ? 'Open' : item.status}
+            </Text>
           </View>
-          {/* REMOVED: lockedText style -> Title is always bright */}
           <Text style={styles.weekTitle}>{item.title}</Text>
         </Card>
       </TouchableOpacity>
@@ -39,7 +38,7 @@ export default function TrainingPlanScreen({ navigation }) {
     <View style={styles.container}>
       <Text style={styles.headerTitle}>YOUR PROGRAM</Text>
       <FlatList
-        data={PROGRAM_SCHEDULE}
+        data={program} // <--- Use REAL Data
         renderItem={renderWeekItem}
         keyExtractor={item => item.weekId.toString()}
         contentContainerStyle={styles.listContent}
@@ -59,6 +58,5 @@ const styles = StyleSheet.create({
   weekType: { fontSize: 12, fontWeight: '700', letterSpacing: 1 },
   statusBadge: { fontSize: 12, fontWeight: '600' },
   weekTitle: { color: Colors.textPrimary, fontSize: 18, fontWeight: 'bold' },
-  lockedText: { color: Colors.textDim },
-  activeBorder: { borderColor: Colors.primary, borderWidth: 1 },
+  activeCardBorder: { borderColor: Colors.primary, borderWidth: 1 },
 });

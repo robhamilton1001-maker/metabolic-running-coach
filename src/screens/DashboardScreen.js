@@ -1,25 +1,44 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Card } from '../components/UI/Card';
 import Colors from '../constants/colors';
 import { useUser } from '../context/UserContext';
 
+// Helper to match the generator's date format (e.g., "30 Nov")
+const getFormattedDate = (date) => {
+  const d = new Date(date);
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${d.getDate()} ${months[d.getMonth()]}`;
+};
+
 export default function DashboardScreen({ navigation }) {
   const { user, program } = useUser();
+  
+  // 1. Find the Active Week (or default to Week 1)
   const activeWeek = program.find(w => w.status === 'Active') || program[0];
   
-  // For this demo, we simulate that "Today" is the 3rd day of the active week (Wednesday)
-  // In a real app, you would compare new Date() with the dates in your data
-  const todayIndex = 2; 
-  const today = activeWeek.days[todayIndex];
-  const tomorrow = activeWeek.days[todayIndex + 1]; 
+  // 2. Find "Today" dynamically
+  const todayString = getFormattedDate(new Date());
+  const todayIndex = activeWeek.days.findIndex(d => d.date === todayString);
+  
+  // If today isn't in this week (e.g., next week), default to first day
+  const safeIndex = todayIndex !== -1 ? todayIndex : 0;
+  
+  const todaySession = activeWeek.days[safeIndex];
+  const tomorrowSession = activeWeek.days[safeIndex + 1];
 
-  // State to track which day is selected in the calendar strip
-  const [selectedDay, setSelectedDay] = useState(today); 
+  // 3. State: Default selection to "Today"
+  // We use useEffect to update selection if the week changes
+  const [selectedDay, setSelectedDay] = useState(todaySession);
 
-  // Calculate Plan Progress (e.g., Day 17 of 84)
+  useEffect(() => {
+    setSelectedDay(todaySession);
+  }, [activeWeek]);
+
+  // 4. Calculate Real Progress
   const totalDays = user.plan_duration_weeks * 7;
-  const daysCompleted = ((activeWeek.weekId - 1) * 7) + todayIndex + 1;
+  // (Past weeks * 7) + (Days passed this week)
+  const daysCompleted = ((activeWeek.weekId - 1) * 7) + (safeIndex + 1);
   const progressPercent = daysCompleted / totalDays;
 
   return (
@@ -35,6 +54,8 @@ export default function DashboardScreen({ navigation }) {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.calendarScroll}>
           {activeWeek.days.map((day) => {
             const isSelected = selectedDay.id === day.id;
+            const realTodayString = getFormattedDate(new Date());
+            const isToday = day.date === realTodayString;
             const isComplete = day.status === 'Complete';
             
             return (
@@ -47,8 +68,10 @@ export default function DashboardScreen({ navigation }) {
                 ]}
                 onPress={() => setSelectedDay(day)}
               >
-                <Text style={[styles.dayName, isSelected && styles.textSelected]}>{day.day}</Text>
-                <Text style={[styles.dateNumber, isSelected && styles.textSelected]}>{day.date}</Text>
+                <Text style={[styles.dayName, isSelected && styles.textSelected]}>
+                  {isToday ? 'TODAY' : day.day}
+                </Text>
+                <Text style={[styles.dateNumber, isSelected && styles.textSelected]}>{day.date.split(' ')[0]}</Text>
                 
                 <View style={[
                   styles.statusDot, 
@@ -74,14 +97,14 @@ export default function DashboardScreen({ navigation }) {
         </Text>
       </Card>
 
-      {/* Active Session Card (Dynamic based on selection) */}
+      {/* Active Session Card */}
       <Card style={{ 
         borderLeftWidth: 4, 
         borderLeftColor: selectedDay.type === 'Rest' ? Colors.textDim : Colors.primary 
       }}>
         <View style={styles.cardHeaderRow}>
           <Text style={styles.cardLabel}>
-            {selectedDay.id === today.id ? "TODAY'S SESSION" : `${selectedDay.day.toUpperCase()} ${selectedDay.date}`}
+            {selectedDay.id === todaySession.id ? "TODAY'S SESSION" : `${selectedDay.day.toUpperCase()} ${selectedDay.date}`}
           </Text>
           <Text style={[styles.cardTag, { color: selectedDay.type === 'Rest' ? Colors.textDim : Colors.primary }]}>
             {selectedDay.type.toUpperCase()}
@@ -90,32 +113,48 @@ export default function DashboardScreen({ navigation }) {
         
         <Text style={styles.sessionTitle}>{selectedDay.title}</Text>
         <Text style={styles.sessionDetail}>Duration: {selectedDay.duration}</Text>
-        <Text style={styles.sessionDetail}>Status: {selectedDay.status}</Text>
+        
+        {/* Status Indicator */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 6 }}>
+           <View style={{ 
+             width: 8, height: 8, borderRadius: 4, 
+             backgroundColor: selectedDay.status === 'Complete' ? Colors.success : Colors.textDim 
+           }} />
+           <Text style={styles.sessionDetail}>{selectedDay.status}</Text>
+        </View>
 
+        {/* Start Button - Only if Run & Not Complete */}
         {selectedDay.type === 'Run' && (
           <TouchableOpacity 
-            style={styles.actionButton} 
+            style={[
+              styles.actionButton,
+              selectedDay.status === 'Complete' && styles.actionButtonComplete
+            ]} 
             onPress={() => navigation.navigate('SessionDetail', {
               workoutTitle: selectedDay.title,
-              targetDuration: selectedDay.duration
+              targetDuration: selectedDay.duration,
+              weekId: activeWeek.weekId,  // Correctly passing ID
+              dayId: selectedDay.id       // Correctly passing ID
             })}
           >
-            <Text style={styles.actionButtonText}>Start Run</Text>
+            <Text style={styles.actionButtonText}>
+              {selectedDay.status === 'Complete' ? "View Results" : "Start Run"}
+            </Text>
           </TouchableOpacity>
         )}
       </Card>
 
-      {/* NEW: Tomorrow's Session Preview */}
-      {tomorrow && (
+      {/* Tomorrow's Session Preview */}
+      {tomorrowSession && (
         <>
           <Text style={styles.sectionTitle}>UP NEXT</Text>
           <Card style={{ opacity: 0.8 }}>
              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardLabel}>TOMORROW ({tomorrow.day})</Text>
-                <Text style={[styles.cardTag, { color: Colors.textSecondary }]}>{tomorrow.type.toUpperCase()}</Text>
+                <Text style={styles.cardLabel}>TOMORROW</Text>
+                <Text style={[styles.cardTag, { color: Colors.textSecondary }]}>{tomorrowSession.type.toUpperCase()}</Text>
              </View>
-             <Text style={[styles.sessionTitle, { fontSize: 18 }]}>{tomorrow.title}</Text>
-             <Text style={styles.sessionDetail}>{tomorrow.duration}</Text>
+             <Text style={[styles.sessionTitle, { fontSize: 18 }]}>{tomorrowSession.title}</Text>
+             <Text style={styles.sessionDetail}>{tomorrowSession.duration}</Text>
           </Card>
         </>
       )}
@@ -132,7 +171,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 20,
     paddingTop: 60,
-    paddingBottom: 100, // Extra padding to fix scrolling issue
+    paddingBottom: 100, 
   },
   headerRow: {
     flexDirection: 'row',
@@ -146,7 +185,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.5,
   },
-  // Calendar Styles
   calendarContainer: {
     marginBottom: 24,
   },
@@ -181,9 +219,10 @@ const styles = StyleSheet.create({
   },
   dayName: {
     color: Colors.textSecondary,
-    fontSize: 12,
+    fontSize: 10, // Slightly smaller to fit "TODAY"
     marginBottom: 4,
     fontWeight: '600',
+    textTransform: 'uppercase',
   },
   dateNumber: {
     color: Colors.textPrimary,
@@ -199,7 +238,6 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     marginTop: 6,
   },
-  // Progress Bar Styles
   progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -221,7 +259,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     borderRadius: 4,
   },
-  // Card Internals
   cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -260,6 +297,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 24,
+  },
+  actionButtonComplete: {
+    backgroundColor: Colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: Colors.success,
   },
   actionButtonText: {
     color: Colors.background,

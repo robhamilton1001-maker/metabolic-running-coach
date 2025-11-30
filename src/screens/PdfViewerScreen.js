@@ -1,12 +1,13 @@
 import * as DocumentPicker from 'expo-document-picker';
-import { Alert, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as Sharing from 'expo-sharing'; // <--- NEW IMPORT
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native'; // Removed Linking
 import { Card } from '../components/UI/Card';
 import { IconSymbol } from '../components/UI/IconSymbol';
 import Colors from '../constants/colors';
-import { useUser } from '../context/UserContext'; // Import Global Data
+import { useUser } from '../context/UserContext';
 
 export default function PdfViewerScreen({ navigation }) {
-  const { user, updateUser } = useUser(); // Access global user data
+  const { user, updateUser } = useUser();
 
   const pickDocument = async () => {
     try {
@@ -16,7 +17,6 @@ export default function PdfViewerScreen({ navigation }) {
       });
 
       if (!result.canceled) {
-        // Save to GLOBAL Context so it persists
         updateUser({ 
             report_pdf_uri: result.assets[0].uri,
             report_pdf_name: result.assets[0].name
@@ -29,13 +29,16 @@ export default function PdfViewerScreen({ navigation }) {
   };
 
   const viewDocument = async () => {
-    if (user.report_pdf_uri) {
-      try {
-        // This opens the native PDF viewer on iOS/Android
-        await Linking.openURL(user.report_pdf_uri);
-      } catch (e) {
-        Alert.alert("Error", "Unable to open this file.");
-      }
+    if (!user.report_pdf_uri) return;
+
+    if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(user.report_pdf_uri, {
+            mimeType: 'application/pdf',
+            dialogTitle: 'Open PDF with...', // Android prompt title
+            UTI: 'com.adobe.pdf' // iOS hint
+        });
+    } else {
+        Alert.alert("Error", "Sharing is not available on this device.");
     }
   };
 
@@ -64,9 +67,9 @@ export default function PdfViewerScreen({ navigation }) {
               </Text>
               <Text style={styles.fileInfo}>Ready for Review</Text>
               
-              {/* NEW: View Button */}
+              {/* View Button */}
               <TouchableOpacity style={styles.viewButton} onPress={viewDocument}>
-                <Text style={styles.viewButtonText}>Open Report</Text>
+                <Text style={styles.viewButtonText}>Open / Share PDF</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.replaceButton} onPress={pickDocument}>
@@ -75,6 +78,7 @@ export default function PdfViewerScreen({ navigation }) {
             </View>
           ) : (
             <View style={styles.emptyState}>
+              {/* Ensure you have 'doc.text.fill' mapped in IconSymbol, or use 'doc' */}
               <IconSymbol name="doc.text.fill" size={48} color={Colors.textDim} />
               <Text style={styles.emptyTitle}>No Report Uploaded</Text>
               <Text style={styles.emptyText}>
@@ -95,7 +99,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-    paddingTop: 60, // Keeps it safe from the notch
+    paddingTop: 60,
   },
   header: {
     flexDirection: 'row',
@@ -127,7 +131,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderStyle: 'dashed', 
   },
-  // Empty State
   emptyState: {
     alignItems: 'center',
     gap: 12,
@@ -157,7 +160,6 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: 'bold',
   },
-  // Uploaded State
   uploadedState: {
     alignItems: 'center',
     gap: 10,

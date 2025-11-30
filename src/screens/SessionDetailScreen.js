@@ -7,22 +7,37 @@ import Colors from '../constants/colors';
 import { useUser } from '../context/UserContext';
 
 export default function SessionDetailScreen({ navigation, route }) {
+  // 1. Get Identifiers passed from previous screens
   const { workoutTitle = "Run", targetDuration = "Open", weekId, dayId } = route.params || {};
-  const { markSessionComplete } = useUser();
-  const [image, setImage] = useState(null);
+  const { program, markSessionComplete } = useUser();
 
-  // New Function: Handles completion logic separately from upload
+  // 2. LOOK UP the specific session in Global State
+  // This ensures we see the current status/image immediately upon loading
+  const weekData = program.find(w => w.weekId === weekId);
+  const sessionData = weekData?.days.find(d => d.id === dayId);
+
+  // 3. Derive State from Global Data
+  const isComplete = sessionData?.status === 'Complete';
+  const savedImage = sessionData?.proofImage;
+
+  // Local state for NEW image selection (before saving)
+  const [selectedImage, setSelectedImage] = useState(null);
+
+  // The image to display: New selection OR Saved image
+  const displayImage = selectedImage || savedImage;
+
   const handleComplete = () => {
-    if (weekId && dayId) {
-      // Mark complete (passing image if one was selected, otherwise null)
-      markSessionComplete(weekId, dayId, image);
-      
-      Alert.alert("Session Complete", "Great work! Your progress has been saved.", [
-        { text: "OK", onPress: () => navigation.goBack() }
-      ]);
-    } else {
-      Alert.alert("Preview Mode", "Session marked complete.");
+    if (!weekId || !dayId) {
+      Alert.alert("Preview Mode", "This is a preview. Start the plan to track progress.");
+      return;
     }
+
+    // Save to Context (Progress + Image)
+    markSessionComplete(weekId, dayId, displayImage);
+    
+    Alert.alert("Session Complete", "Great work! Progress saved.", [
+      { text: "OK", onPress: () => navigation.goBack() }
+    ]);
   };
 
   const pickImage = async () => {
@@ -34,9 +49,13 @@ export default function SessionDetailScreen({ navigation, route }) {
     });
 
     if (!result.canceled) {
-      setImage(result.assets[0].uri);
+      setSelectedImage(result.assets[0].uri);
     }
   };
+
+  // Visual State for Button
+  const buttonStyle = isComplete ? styles.disabledButton : styles.completeButton;
+  const buttonText = isComplete ? "COMPLETED" : "MARK AS COMPLETE";
 
   return (
     <View style={styles.container}>
@@ -55,8 +74,8 @@ export default function SessionDetailScreen({ navigation, route }) {
                <Text style={styles.label}>WORKOUT</Text>
                <Text style={styles.title}>{workoutTitle}</Text>
             </View>
-            {/* Visual Checkmark if image is uploaded */}
-            {image && <IconSymbol name="checkmark.circle.fill" size={32} color={Colors.success} />}
+            {/* Visual Checkmark if Complete */}
+            {isComplete && <IconSymbol name="checkmark.circle.fill" size={32} color={Colors.success} />}
           </View>
           
           <View style={styles.row}>
@@ -74,21 +93,25 @@ export default function SessionDetailScreen({ navigation, route }) {
           </Text>
         </Card>
 
-        {/* Optional Upload Section */}
+        {/* Upload Section */}
         <TouchableOpacity style={styles.uploadRow} onPress={pickImage}>
            <IconSymbol name="arrow.clockwise" size={20} color={Colors.primary} />
            <Text style={styles.uploadText}>
-             {image ? "Change Uploaded Photo" : "Upload Workout Photo (Optional)"}
+             {displayImage ? "Change Photo" : "Upload Workout Photo (Optional)"}
            </Text>
         </TouchableOpacity>
 
-        {image && (
-           <Image source={{ uri: image }} style={styles.previewImage} />
+        {displayImage && (
+           <Image source={{ uri: displayImage }} style={styles.previewImage} />
         )}
 
-        {/* Primary Action: Complete Button */}
-        <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
-          <Text style={styles.completeButtonText}>MARK AS COMPLETE</Text>
+        {/* Action Button - Changes color if complete */}
+        <TouchableOpacity 
+          style={buttonStyle} 
+          onPress={handleComplete}
+          disabled={isComplete && !selectedImage} // Disable if complete (unless updating photo)
+        >
+          <Text style={styles.completeButtonText}>{buttonText}</Text>
         </TouchableOpacity>
 
       </ScrollView>
@@ -109,7 +132,6 @@ const styles = StyleSheet.create({
   detail: { color: Colors.textSecondary, fontSize: 18 },
   notes: { color: Colors.textSecondary, fontSize: 16, lineHeight: 24 },
   
-  // Upload Styles (Secondary)
   uploadRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -122,32 +144,30 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderStyle: 'dashed',
   },
-  uploadText: {
-    color: Colors.primary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  previewImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  // Complete Button (Primary)
+  uploadText: { color: Colors.primary, fontSize: 14, fontWeight: '600' },
+  previewImage: { width: '100%', height: 200, borderRadius: 12, marginBottom: 20 },
+  
+  // Button Variations
   completeButton: {
-    backgroundColor: Colors.success, // Green for completion
+    backgroundColor: Colors.primary, // Default Cyan
     padding: 20,
     borderRadius: 16,
     alignItems: 'center',
     marginTop: 10,
     marginBottom: 40,
-    shadowColor: Colors.success,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+  },
+  disabledButton: {
+    backgroundColor: Colors.surfaceLight, // Greyed out
+    padding: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 40,
+    borderWidth: 1,
+    borderColor: Colors.success, // Green Border
   },
   completeButtonText: {
-    color: '#000000', // Black text on green button
+    color: Colors.background,
     fontSize: 18,
     fontWeight: '900',
     letterSpacing: 1,
