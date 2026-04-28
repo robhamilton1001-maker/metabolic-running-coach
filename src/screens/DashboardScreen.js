@@ -1,21 +1,29 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Colors from '../constants/colors';
 import { useUser } from '../context/UserContext';
 
-// Helper to format JS dates into dictionary keys (YYYY-MM-DD)
 const toDateKey = (dateObj) => dateObj.toISOString().split('T')[0];
 
 export default function DashboardScreen({ navigation }) {
-  const { mappedPlan, athleteMetadata } = useUser();
+  const { mappedPlan, athleteMetadata, rawSchedule } = useUser();
   
-  // Keep track of what date the user tapped on the carousel (defaults to today)
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const selectedKey = toDateKey(selectedDate);
-  const selectedWorkout = mappedPlan ? mappedPlan[selectedKey] : null;
+  
+  if (!mappedPlan) return null;
 
-  // Generate a 7-day strip centered around the selected date
+  const todayKey = toDateKey(new Date());
+  const selectedKey = toDateKey(selectedDate);
+  const selectedWorkout = mappedPlan[selectedKey];
+
+  // Calculate Tomorrow's data based on the selected date
+  const tomorrowDate = new Date(selectedDate);
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrowKey = toDateKey(tomorrowDate);
+  const tomorrowWorkout = mappedPlan[tomorrowKey];
+
   const generateDateStrip = () => {
     const strip = [];
     for (let i = -3; i <= 3; i++) {
@@ -27,26 +35,37 @@ export default function DashboardScreen({ navigation }) {
   };
 
   const dateStrip = generateDateStrip();
-  const todayKey = toDateKey(new Date());
 
-  if (!mappedPlan) return null;
+  // Find out what week we are currently in to show a premium progress header
+  const currentWeekNumber = selectedWorkout ? selectedWorkout.weekNumber : null;
+  const currentPhase = selectedWorkout ? selectedWorkout.phase : "Out of Season";
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        {/* Header */}
+        {/* Premium Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Hello, {athleteMetadata?.athleteName?.split(' ')[0] || "Athlete"}</Text>
-            <Text style={styles.subGreeting}>Here is your schedule.</Text>
+            <Text style={styles.greeting}>Good Morning,</Text>
+            <Text style={styles.athleteName}>{athleteMetadata?.athleteName || "Athlete"}</Text>
           </View>
-          <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.iconButton}>
-            <MaterialIcons name="settings" size={28} color={Colors.textPrimary} />
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.avatarButton}>
+            <MaterialIcons name="person-outline" size={28} color={Colors.primary} />
           </TouchableOpacity>
         </View>
 
-        {/* Date Carousel */}
+        {/* Macrocycle Context Pill */}
+        {currentWeekNumber ? (
+          <View style={styles.contextPill}>
+             <MaterialIcons name="analytics" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
+             <Text style={styles.contextPillText}>
+               Phase: {currentPhase.toUpperCase()}  •  Week {currentWeekNumber} of 16
+             </Text>
+          </View>
+        ) : null}
+
+        {/* Elevated Bubble Carousel */}
         <View style={styles.carouselContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carouselScroll}>
             {dateStrip.map((dateObj, index) => {
@@ -59,55 +78,79 @@ export default function DashboardScreen({ navigation }) {
               return (
                 <TouchableOpacity 
                   key={index} 
-                  style={[styles.dateBox, isSelected && styles.dateBoxSelected]}
+                  style={[styles.bubble, isSelected ? styles.bubbleSelected : styles.bubbleInactive]}
                   onPress={() => setSelectedDate(dateObj)}
                 >
-                  <Text style={[styles.dateBoxDay, isSelected && styles.dateBoxDaySelected]}>{dayOfWeek}</Text>
-                  <Text style={[styles.dateBoxNum, isSelected && styles.dateBoxNumSelected]}>{dayNumber}</Text>
-                  {isToday && <View style={styles.todayDot} />}
+                  <Text style={[styles.bubbleDay, isSelected ? styles.bubbleTextSelected : styles.bubbleTextInactive]}>
+                    {dayOfWeek}
+                  </Text>
+                  <Text style={[styles.bubbleNum, isSelected ? styles.bubbleTextSelected : styles.bubbleTextInactive]}>
+                    {dayNumber}
+                  </Text>
+                  {isToday ? <View style={[styles.todayDot, isSelected ? {backgroundColor: '#000'} : {backgroundColor: Colors.primary}]} /> : null}
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
         </View>
 
-        {/* Workout Card */}
+        {/* Selected Session Hero Card */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
-            {selectedKey === todayKey ? "Today's Session" : selectedDate.toDateString()}
+            {selectedKey === todayKey ? "Today's Target" : selectedDate.toDateString()}
           </Text>
         </View>
         
         {selectedWorkout ? (
-          <View style={styles.workoutCard}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.phaseBadge}>{String(selectedWorkout.phase).toUpperCase()}</Text>
-              <Text style={styles.categoryBadge(selectedWorkout.category)}>
-                {String(selectedWorkout.category).toUpperCase()}
-              </Text>
+          <View style={styles.heroCard}>
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.badge(selectedWorkout.category)}>
+                <Text style={styles.badgeText(selectedWorkout.category)}>
+                  {String(selectedWorkout.category).toUpperCase()}
+                </Text>
+              </View>
             </View>
             
-            <Text style={styles.sessionText}>
+            <Text style={styles.heroSessionText}>
               {selectedWorkout.sessionText}
             </Text>
 
             <TouchableOpacity 
-              style={styles.actionButton}
+              style={styles.primaryButton}
               onPress={() => navigation.navigate('SessionDetail', { dayData: selectedWorkout })}
             >
-              <Text style={styles.actionButtonText}>View Full Session Details</Text>
-              <MaterialIcons name="arrow-forward-ios" size={16} color="#000" />
+              <Text style={styles.primaryButtonText}>Open Session</Text>
+              <MaterialIcons name="arrow-forward" size={20} color="#000" />
             </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.emptyCard}>
-            <MaterialIcons name="event-available" size={48} color={Colors.textSecondary} style={{ marginBottom: 16 }} />
-            <Text style={styles.emptyCardTitle}>No Session Scheduled</Text>
-            <Text style={styles.emptyCardText}>
-              This date falls outside of your loaded 16-week Peak Oxygen plan.
-            </Text>
+            <MaterialIcons name="nights-stay" size={40} color={Colors.textSecondary} style={{ marginBottom: 12 }} />
+            <Text style={styles.emptyCardTitle}>Rest & Recover</Text>
+            <Text style={styles.emptyCardText}>No clinical data assigned for this date.</Text>
           </View>
         )}
+
+        {/* Up Next Mini-Tile */}
+        {tomorrowWorkout ? (
+          <View style={styles.upNextContainer}>
+            <Text style={styles.sectionTitle}>Up Next</Text>
+            <TouchableOpacity 
+              style={styles.miniTile}
+              onPress={() => {
+                setSelectedDate(tomorrowDate);
+              }}
+            >
+              <View style={styles.miniTileLeft}>
+                <Text style={styles.miniTileLabel}>Tomorrow</Text>
+                <Text style={styles.miniTileText} numberOfLines={1}>
+                  {tomorrowWorkout.sessionText}
+                </Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={24} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
       </ScrollView>
     </SafeAreaView>
@@ -116,35 +159,50 @@ export default function DashboardScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  scrollContent: { paddingBottom: 40 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginTop: 20, marginBottom: 24 },
-  greeting: { fontSize: 28, fontWeight: 'bold', color: Colors.textPrimary },
-  subGreeting: { fontSize: 16, color: Colors.textSecondary, marginTop: 4 },
-  iconButton: { padding: 4 },
+  scrollContent: { paddingBottom: 60 },
   
+  // Header Styles
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginTop: 24, marginBottom: 16 },
+  greeting: { fontSize: 16, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
+  athleteName: { fontSize: 32, fontWeight: '800', color: Colors.textPrimary },
+  avatarButton: { width: 50, height: 50, borderRadius: 25, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
+  
+  // Pill Style
+  contextPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1A2A3A', alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginLeft: 20, marginBottom: 32, borderWidth: 1, borderColor: '#2A3A4A' },
+  contextPillText: { color: Colors.primary, fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
+
+  // Bubble Carousel
   carouselContainer: { marginBottom: 32 },
   carouselScroll: { paddingHorizontal: 16 },
-  dateBox: { width: 64, height: 80, justifyContent: 'center', alignItems: 'center', borderRadius: 16, backgroundColor: Colors.surface, marginHorizontal: 6, borderWidth: 1, borderColor: Colors.border },
-  dateBoxSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  dateBoxDay: { fontSize: 12, fontWeight: 'bold', color: Colors.textSecondary, marginBottom: 4, textTransform: 'uppercase' },
-  dateBoxDaySelected: { color: '#000' },
-  dateBoxNum: { fontSize: 20, fontWeight: 'bold', color: Colors.textPrimary },
-  dateBoxNumSelected: { color: '#000' },
-  todayDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.primary, position: 'absolute', bottom: 8 },
-  
+  bubble: { width: 64, height: 90, justifyContent: 'center', alignItems: 'center', borderRadius: 32, marginHorizontal: 6, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4 }, android: { elevation: 6 } }) },
+  bubbleInactive: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
+  bubbleSelected: { backgroundColor: Colors.primary },
+  bubbleDay: { fontSize: 12, fontWeight: '600', marginBottom: 6, textTransform: 'uppercase' },
+  bubbleNum: { fontSize: 22, fontWeight: '800' },
+  bubbleTextInactive: { color: Colors.textSecondary },
+  bubbleTextSelected: { color: '#000' },
+  todayDot: { width: 6, height: 6, borderRadius: 3, position: 'absolute', bottom: 12 },
+
+  // Hero Card
   sectionHeader: { paddingHorizontal: 20, marginBottom: 16 },
-  sectionTitle: { fontSize: 20, fontWeight: '600', color: Colors.textPrimary },
-  
-  workoutCard: { backgroundColor: Colors.surface, borderRadius: 16, padding: 20, marginHorizontal: 20, borderWidth: 1, borderColor: Colors.border },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center' },
-  phaseBadge: { color: Colors.textSecondary, fontSize: 12, fontWeight: 'bold', letterSpacing: 1 },
-  categoryBadge: (category) => ({ color: category === 'Rest' ? '#4CAF50' : Colors.primary, fontSize: 12, fontWeight: 'bold', letterSpacing: 1 }),
-  sessionText: { fontSize: 24, fontWeight: '500', color: Colors.textPrimary, lineHeight: 34, marginBottom: 24 },
-  
-  actionButton: { backgroundColor: Colors.primary, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 14, borderRadius: 12, marginTop: 8 },
-  actionButtonText: { color: '#000', fontWeight: 'bold', fontSize: 16, marginRight: 8 },
-  
-  emptyCard: { backgroundColor: Colors.surface, borderRadius: 16, padding: 32, marginHorizontal: 20, alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
-  emptyCardTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 8 },
-  emptyCardText: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22 }
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary, letterSpacing: 0.5 },
+  heroCard: { backgroundColor: '#121212', borderRadius: 24, padding: 24, marginHorizontal: 20, borderWidth: 1, borderColor: '#2A2A2A', ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 12 }, android: { elevation: 8 } }) },
+  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
+  badge: (category) => ({ backgroundColor: category === 'Rest' ? 'rgba(76, 175, 80, 0.15)' : 'rgba(0, 224, 255, 0.15)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: category === 'Rest' ? 'rgba(76, 175, 80, 0.3)' : 'rgba(0, 224, 255, 0.3)' }),
+  badgeText: (category) => ({ color: category === 'Rest' ? '#4CAF50' : Colors.primary, fontSize: 12, fontWeight: 'bold', letterSpacing: 1 }),
+  heroSessionText: { fontSize: 28, fontWeight: '600', color: Colors.textPrimary, lineHeight: 38, marginBottom: 32 },
+  primaryButton: { backgroundColor: Colors.primary, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 16, borderRadius: 16 },
+  primaryButtonText: { color: '#000', fontWeight: '800', fontSize: 16, marginRight: 8, textTransform: 'uppercase', letterSpacing: 1 },
+
+  // Empty State
+  emptyCard: { backgroundColor: 'transparent', borderRadius: 24, padding: 32, marginHorizontal: 20, alignItems: 'center', borderWidth: 1, borderColor: Colors.border, borderStyle: 'dashed' },
+  emptyCardTitle: { fontSize: 20, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 8 },
+  emptyCardText: { fontSize: 15, color: Colors.textSecondary, textAlign: 'center' },
+
+  // Up Next Tile
+  upNextContainer: { marginTop: 32, paddingHorizontal: 20 },
+  miniTile: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: Colors.border, marginTop: 12 },
+  miniTileLeft: { flex: 1, marginRight: 16 },
+  miniTileLabel: { fontSize: 12, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4, fontWeight: '600' },
+  miniTileText: { fontSize: 16, color: Colors.textPrimary, fontWeight: '500' }
 });

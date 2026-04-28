@@ -1,4 +1,5 @@
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Colors from '../constants/colors';
 import { useUser } from '../context/UserContext';
 
@@ -116,4 +117,4 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     lineHeight: 22,
   }
-});
+}); 

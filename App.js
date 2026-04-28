@@ -4,8 +4,7 @@ import { DarkTheme, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-
-// Import Components
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppLoading from './src/components/AppLoading';
 
 // Import Screens
@@ -101,6 +100,7 @@ export default function App() {
 
   return (
     <UserProvider>
+      <SafeAreaProvider>
       {/* 3. Pass the Dark Theme */}
       <NavigationContainer theme={NavTheme}>
         <StatusBar style="light" />
@@ -149,6 +149,7 @@ export default function App() {
 />
         </Stack.Navigator>
       </NavigationContainer>
+      </SafeAreaProvider>
     </UserProvider>
   );
 }
