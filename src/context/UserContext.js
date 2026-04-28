@@ -1,102 +1,95 @@
 import { createContext, useContext, useState } from 'react';
-import { generateProgram } from '../Utils/programGenerator';
-
-// 1. Define the "Schema"
-const defaultUserData = {
-  username: "roberthamilton", 
-  profile_image_url: null,
-  
-  // NEW: Program Start Date (Default to today)
-  start_date: new Date().toISOString(),
-
-  // PDF Report Storage
-  report_pdf_uri: null,
-  report_pdf_name: null,
-  
-  // Physiology
-  vo2_max: 54,
-  hr_max: 190,
-  lt1_hr: 145, 
-  lt2_hr: 170, 
-  
-  // Plan Configuration
-  availability_days: 5, 
-  plan_duration_weeks: 12, 
-  
-  // Preferences
-  preferred_unit: 'metric', 
-  stats_display_preferences: ["5k", "Half Marathon"],
-  
-  // Personal Bests (Pre/Post)
-  pb_times: {
-    "5k": { pre: "22:30", post: null },
-    "10k": { pre: "48:00", post: null },
-    "15k": { pre: null, post: null },
-    "Half": { pre: "1:45:00", post: null },
-    "Full": { pre: null, post: null },
-  }
-};
 
 const UserContext = createContext();
 
 export const UserProvider = ({ children }) => {
-  const [user, setUser] = useState(defaultUserData);
+  // Store basic settings (kept minimal for now)
+  const [userSettings, setUserSettings] = useState({
+    preferred_unit: 'metric',
+  });
 
-  // Initialize program dynamically
-  // We now pass the START DATE to the generator
-  const [program, setProgram] = useState(
-    generateProgram(
-      defaultUserData.plan_duration_weeks, 
-      defaultUserData.availability_days,
-      new Date(defaultUserData.start_date)
-    )
-  );
+  // The Peak Oxygen Analytics imported data states
+  const [athleteMetadata, setAthleteMetadata] = useState(null);
+  const [rawSchedule, setRawSchedule] = useState(null);
+  const [startDate, setStartDate] = useState(null); // ISO string
+  const [mappedPlan, setMappedPlan] = useState(null); // Dictionary: { "YYYY-MM-DD": workoutObject }
 
-  // Helper to update user profile
-  const updateUser = (updates) => {
-    setUser(prev => {
-      const newUser = { ...prev, ...updates };
+  // 1. The Core Ingestion & Mapping Engine
+  const importPlan = (jsonData, selectedStartDateStr) => {
+    // Sanity check the JSON structure
+    if (!jsonData || !jsonData.schedule || !jsonData.metadata) {
+      throw new Error("Invalid plan file format. Must be a Peak Oxygen JSON.");
+    }
+
+    const start = new Date(selectedStartDateStr);
+    
+    // Ensure start date is a Monday (0 = Sunday, 1 = Monday)
+    if (start.getDay() !== 1) {
+      throw new Error("Start date must be a Monday");
+    }
+
+    const newMappedPlan = {};
+
+    // 2. Map the 112-day array to specific calendar dates
+    jsonData.schedule.forEach(dayInfo => {
+      const currentDayDate = new Date(start);
+      // dayNumber starts at 1, so offset by dayNumber - 1
+      const dayOffset = dayInfo.dayNumber - 1; 
+      currentDayDate.setDate(start.getDate() + dayOffset);
+
+      // Create a clean "YYYY-MM-DD" key for easy dictionary lookup later
+      const dateKey = currentDayDate.toISOString().split('T')[0];
       
-      // Regenerate program if Duration, Days, or Start Date changes
-      if (
-        (updates.plan_duration_weeks && updates.plan_duration_weeks !== prev.plan_duration_weeks) ||
-        (updates.availability_days && updates.availability_days !== prev.availability_days) ||
-        (updates.start_date && updates.start_date !== prev.start_date)
-      ) {
-        setProgram(generateProgram(
-          newUser.plan_duration_weeks, 
-          newUser.availability_days,
-          new Date(newUser.start_date) // Pass the new date object
-        ));
-      }
-      
-      return newUser;
+      newMappedPlan[dateKey] = {
+        ...dayInfo, // Spreads in phase, dayOfWeek, category, sessionText, etc.
+        dateStr: dateKey,
+        dateObject: currentDayDate,
+        status: 'Pending', // Default status for UI completion tracking
+        proofImage: null
+      };
+    });
+
+    // 3. Save to Global State
+    setAthleteMetadata(jsonData.metadata);
+    setRawSchedule(jsonData.schedule);
+    setStartDate(start.toISOString());
+    setMappedPlan(newMappedPlan);
+  };
+
+  // Helper to mark a specific calendar date's session as complete
+  const markSessionComplete = (dateKey, imageUri) => {
+    setMappedPlan(prev => {
+      if (!prev[dateKey]) return prev;
+      return {
+        ...prev,
+        [dateKey]: {
+          ...prev[dateKey],
+          status: 'Complete',
+          proofImage: imageUri
+        }
+      };
     });
   };
 
-  // Helper to mark a session as complete
-  const markSessionComplete = (weekId, dayId, imageUri) => {
-    setProgram(prevProgram => {
-      return prevProgram.map(week => {
-        if (week.weekId !== weekId) return week;
-
-        const updatedDays = week.days.map(day => {
-          if (day.id === dayId) {
-            return { ...day, status: 'Complete', proofImage: imageUri };
-          }
-          return day;
-        });
-
-        const allDaysComplete = updatedDays.every(d => d.status === 'Complete');
-        const newWeekStatus = allDaysComplete ? 'Complete' : week.status;
-
-        return { ...week, days: updatedDays, status: newWeekStatus };
-      });
-    });
+  // Helper to clear the plan (e.g., for uploading a new one)
+  const clearPlan = () => {
+    setAthleteMetadata(null);
+    setRawSchedule(null);
+    setStartDate(null);
+    setMappedPlan(null);
   };
 
   return (
-    <UserContext.Provider value={{ user, updateUser, program, markSessionComplete }}>
+    <UserContext.Provider value={{ 
+      userSettings,
+      athleteMetadata, 
+      rawSchedule, 
+      startDate, 
+      mappedPlan, 
+      importPlan,
+      markSessionComplete,
+      clearPlan
+    }}>
       {children}
     </UserContext.Provider>
   );
