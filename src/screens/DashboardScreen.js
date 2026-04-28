@@ -1,86 +1,110 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Colors from '../constants/colors';
 import { useUser } from '../context/UserContext';
 
+// Helper to format JS dates into dictionary keys (YYYY-MM-DD)
+const toDateKey = (dateObj) => dateObj.toISOString().split('T')[0];
+
 export default function DashboardScreen({ navigation }) {
-  const { mappedPlan, athleteMetadata, markSessionComplete } = useUser();
-  const [todayWorkout, setTodayWorkout] = useState(null);
-  const [todayDateStr, setTodayDateStr] = useState('');
+  const { mappedPlan, athleteMetadata } = useUser();
+  
+  // Keep track of what date the user tapped on the carousel (defaults to today)
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const selectedKey = toDateKey(selectedDate);
+  const selectedWorkout = mappedPlan ? mappedPlan[selectedKey] : null;
 
-  useEffect(() => {
-    // If no plan is loaded, kick them back to Onboarding
-    if (!mappedPlan) {
-      navigation.replace('Onboarding');
-      return;
+  // Generate a 7-day strip centered around the selected date
+  const generateDateStrip = () => {
+    const strip = [];
+    for (let i = -3; i <= 3; i++) {
+      const d = new Date(selectedDate);
+      d.setDate(d.getDate() + i);
+      strip.push(d);
     }
+    return strip;
+  };
 
-    // Get today's date in YYYY-MM-DD format based on the device's local time
-    const today = new Date();
-    // For testing purposes, you can hardcode a date here that you know is in your plan!
-    // const todayStr = "2026-05-11"; 
-    const todayStr = today.toISOString().split('T')[0];
-    
-    setTodayDateStr(todayStr);
-    setTodayWorkout(mappedPlan[todayStr]);
-  }, [mappedPlan]);
+  const dateStrip = generateDateStrip();
+  const todayKey = toDateKey(new Date());
 
-  if (!mappedPlan) return null; // Prevent flash before redirect
+  if (!mappedPlan) return null;
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
         {/* Header */}
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>Hello, {athleteMetadata?.athleteName?.split(' ')[0] || "Athlete"}</Text>
-            <Text style={styles.dateText}>{new Date(todayDateStr).toDateString()}</Text>
+            <Text style={styles.subGreeting}>Here is your schedule.</Text>
           </View>
-          <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.iconButton}>
             <MaterialIcons name="settings" size={28} color={Colors.textPrimary} />
           </TouchableOpacity>
         </View>
 
-        {/* Today's Workout Card */}
-        <Text style={styles.sectionTitle}>Today's Session</Text>
+        {/* Date Carousel */}
+        <View style={styles.carouselContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carouselScroll}>
+            {dateStrip.map((dateObj, index) => {
+              const dKey = toDateKey(dateObj);
+              const isSelected = dKey === selectedKey;
+              const isToday = dKey === todayKey;
+              const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+              const dayNumber = dateObj.getDate();
+
+              return (
+                <TouchableOpacity 
+                  key={index} 
+                  style={[styles.dateBox, isSelected && styles.dateBoxSelected]}
+                  onPress={() => setSelectedDate(dateObj)}
+                >
+                  <Text style={[styles.dateBoxDay, isSelected && styles.dateBoxDaySelected]}>{dayOfWeek}</Text>
+                  <Text style={[styles.dateBoxNum, isSelected && styles.dateBoxNumSelected]}>{dayNumber}</Text>
+                  {isToday && <View style={styles.todayDot} />}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* Workout Card */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            {selectedKey === todayKey ? "Today's Session" : selectedDate.toDateString()}
+          </Text>
+        </View>
         
-        {todayWorkout ? (
+        {selectedWorkout ? (
           <View style={styles.workoutCard}>
             <View style={styles.cardHeader}>
-              <Text style={styles.phaseBadge}>{todayWorkout.phase.toUpperCase()}</Text>
-              <Text style={styles.categoryBadge(todayWorkout.category)}>
-                {todayWorkout.category.toUpperCase()}
+              <Text style={styles.phaseBadge}>{String(selectedWorkout.phase).toUpperCase()}</Text>
+              <Text style={styles.categoryBadge(selectedWorkout.category)}>
+                {String(selectedWorkout.category).toUpperCase()}
               </Text>
             </View>
             
             <Text style={styles.sessionText}>
-              {todayWorkout.sessionText}
+              {selectedWorkout.sessionText}
             </Text>
 
-            {/* Status & Action */}
-            <View style={styles.actionContainer}>
-              <Text style={styles.statusText(todayWorkout.status)}>
-                Status: {todayWorkout.status}
-              </Text>
-              
-              {todayWorkout.status === 'Pending' && todayWorkout.category !== 'Rest' && (
-                <TouchableOpacity 
-                  style={styles.completeButton}
-                  onPress={() => markSessionComplete(todayDateStr, null)}
-                >
-                  <Text style={styles.completeButtonText}>Mark Complete</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => navigation.navigate('SessionDetail', { dayData: selectedWorkout })}
+            >
+              <Text style={styles.actionButtonText}>View Full Session Details</Text>
+              <MaterialIcons name="arrow-forward-ios" size={16} color="#000" />
+            </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.emptyCard}>
-            <MaterialIcons name="event-available" size={48} color={Colors.textSecondary} />
+            <MaterialIcons name="event-available" size={48} color={Colors.textSecondary} style={{ marginBottom: 16 }} />
             <Text style={styles.emptyCardTitle}>No Session Scheduled</Text>
             <Text style={styles.emptyCardText}>
-              Today's date ({todayDateStr}) falls outside of your loaded 16-week Peak Oxygen plan.
+              This date falls outside of your loaded 16-week Peak Oxygen plan.
             </Text>
           </View>
         )}
@@ -91,109 +115,36 @@ export default function DashboardScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  scrollContent: {
-    padding: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 32,
-    marginTop: 20,
-  },
-  greeting: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: Colors.textPrimary,
-  },
-  dateText: {
-    fontSize: 16,
-    color: Colors.primary,
-    marginTop: 4,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: Colors.textPrimary,
-    marginBottom: 16,
-  },
-  workoutCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  phaseBadge: {
-    color: Colors.textSecondary,
-    fontSize: 12,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
-  categoryBadge: (category) => ({
-    color: category === 'Rest' ? '#4CAF50' : Colors.primary,
-    fontSize: 12,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  }),
-  sessionText: {
-    fontSize: 24,
-    fontWeight: '500',
-    color: Colors.textPrimary,
-    lineHeight: 34,
-    marginBottom: 24,
-  },
-  actionContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    paddingTop: 16,
-  },
-  statusText: (status) => ({
-    fontSize: 14,
-    fontWeight: '600',
-    color: status === 'Complete' ? '#4CAF50' : Colors.textSecondary,
-  }),
-  completeButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  completeButtonText: {
-    color: '#000',
-    fontWeight: 'bold',
-  },
-  emptyCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 32,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  emptyCardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.textPrimary,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyCardText: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
-  }
+  container: { flex: 1, backgroundColor: Colors.background },
+  scrollContent: { paddingBottom: 40 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginTop: 20, marginBottom: 24 },
+  greeting: { fontSize: 28, fontWeight: 'bold', color: Colors.textPrimary },
+  subGreeting: { fontSize: 16, color: Colors.textSecondary, marginTop: 4 },
+  iconButton: { padding: 4 },
+  
+  carouselContainer: { marginBottom: 32 },
+  carouselScroll: { paddingHorizontal: 16 },
+  dateBox: { width: 64, height: 80, justifyContent: 'center', alignItems: 'center', borderRadius: 16, backgroundColor: Colors.surface, marginHorizontal: 6, borderWidth: 1, borderColor: Colors.border },
+  dateBoxSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  dateBoxDay: { fontSize: 12, fontWeight: 'bold', color: Colors.textSecondary, marginBottom: 4, textTransform: 'uppercase' },
+  dateBoxDaySelected: { color: '#000' },
+  dateBoxNum: { fontSize: 20, fontWeight: 'bold', color: Colors.textPrimary },
+  dateBoxNumSelected: { color: '#000' },
+  todayDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.primary, position: 'absolute', bottom: 8 },
+  
+  sectionHeader: { paddingHorizontal: 20, marginBottom: 16 },
+  sectionTitle: { fontSize: 20, fontWeight: '600', color: Colors.textPrimary },
+  
+  workoutCard: { backgroundColor: Colors.surface, borderRadius: 16, padding: 20, marginHorizontal: 20, borderWidth: 1, borderColor: Colors.border },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center' },
+  phaseBadge: { color: Colors.textSecondary, fontSize: 12, fontWeight: 'bold', letterSpacing: 1 },
+  categoryBadge: (category) => ({ color: category === 'Rest' ? '#4CAF50' : Colors.primary, fontSize: 12, fontWeight: 'bold', letterSpacing: 1 }),
+  sessionText: { fontSize: 24, fontWeight: '500', color: Colors.textPrimary, lineHeight: 34, marginBottom: 24 },
+  
+  actionButton: { backgroundColor: Colors.primary, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 14, borderRadius: 12, marginTop: 8 },
+  actionButtonText: { color: '#000', fontWeight: 'bold', fontSize: 16, marginRight: 8 },
+  
+  emptyCard: { backgroundColor: Colors.surface, borderRadius: 16, padding: 32, marginHorizontal: 20, alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
+  emptyCardTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 8 },
+  emptyCardText: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22 }
 });

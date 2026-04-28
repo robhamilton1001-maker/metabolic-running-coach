@@ -1,8 +1,9 @@
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Colors from '../constants/colors';
 import { useUser } from '../context/UserContext';
 
-export default function TrainingPlanScreen() {
+// Here is the export default! It wraps your entire screen component.
+export default function TrainingPlanScreen({ navigation }) {
   const { rawSchedule } = useUser();
 
   if (!rawSchedule) {
@@ -41,7 +42,12 @@ export default function TrainingPlanScreen() {
             </View>
             
             {week.days.map((day) => (
-              <View key={day.dayNumber} style={styles.dayRow}>
+              // Here is the TouchableOpacity making each row clickable!
+              <TouchableOpacity 
+                key={day.dayNumber} 
+                style={styles.dayRow}
+                onPress={() => navigation.navigate('SessionDetail', { dayData: day })}
+              >
                 <Text style={styles.dayLabel}>{day.dayOfWeek}</Text>
                 <View style={styles.dayContent}>
                   <Text style={styles.categoryLabel(day.category)}>
@@ -51,7 +57,7 @@ export default function TrainingPlanScreen() {
                     {day.sessionText}
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         ))}
