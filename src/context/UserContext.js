@@ -1,66 +1,93 @@
-import { createContext, useContext, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createContext, useContext, useEffect, useState } from 'react';
 
 const UserContext = createContext();
+const STORAGE_KEY = '@peak_oxygen_plan';
 
 export const UserProvider = ({ children }) => {
-  // Store basic settings (kept minimal for now)
-  const [userSettings, setUserSettings] = useState({
-    preferred_unit: 'metric',
-  });
-
-  // The Peak Oxygen Analytics imported data states
+  const [userSettings, setUserSettings] = useState({ preferred_unit: 'metric' });
   const [athleteMetadata, setAthleteMetadata] = useState(null);
   const [rawSchedule, setRawSchedule] = useState(null);
-  const [startDate, setStartDate] = useState(null); // ISO string
-  const [mappedPlan, setMappedPlan] = useState(null); // Dictionary: { "YYYY-MM-DD": workoutObject }
+  const [startDate, setStartDate] = useState(null); 
+  const [mappedPlan, setMappedPlan] = useState(null); 
+  
+  // State to let the app know we are checking the hard drive
+  const [isRestoringData, setIsRestoringData] = useState(true);
 
-  // 1. The Core Ingestion & Mapping Engine
+  // 1. Check Hard Drive on Startup
+  useEffect(() => {
+    const loadSavedPlan = async () => {
+      try {
+        const savedData = await AsyncStorage.getItem(STORAGE_KEY);
+        if (savedData) {
+          const parsed = JSON.parse(savedData);
+          setAthleteMetadata(parsed.athleteMetadata);
+          setRawSchedule(parsed.rawSchedule);
+          setStartDate(parsed.startDate);
+          setMappedPlan(parsed.mappedPlan);
+        }
+      } catch (error) {
+        console.error("Failed to load saved plan", error);
+      } finally {
+        setIsRestoringData(false);
+      }
+    };
+    loadSavedPlan();
+  }, []);
+
+  // 2. Helper to Save to Hard Drive
+  const saveToStorage = async (dataToSave) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+    } catch (error) {
+      console.error("Failed to save plan to storage", error);
+    }
+  };
+
   const importPlan = (jsonData, selectedStartDateStr) => {
-    // Sanity check the JSON structure
     if (!jsonData || !jsonData.schedule || !jsonData.metadata) {
       throw new Error("Invalid plan file format. Must be a Peak Oxygen JSON.");
     }
 
     const start = new Date(selectedStartDateStr);
-    
-    // Ensure start date is a Monday (0 = Sunday, 1 = Monday)
-    if (start.getDay() !== 1) {
-      throw new Error("Start date must be a Monday");
-    }
+    if (start.getDay() !== 1) throw new Error("Start date must be a Monday");
 
     const newMappedPlan = {};
 
-    // 2. Map the 112-day array to specific calendar dates
     jsonData.schedule.forEach(dayInfo => {
       const currentDayDate = new Date(start);
-      // dayNumber starts at 1, so offset by dayNumber - 1
       const dayOffset = dayInfo.dayNumber - 1; 
       currentDayDate.setDate(start.getDate() + dayOffset);
-
-      // Create a clean "YYYY-MM-DD" key for easy dictionary lookup later
       const dateKey = currentDayDate.toISOString().split('T')[0];
       
       newMappedPlan[dateKey] = {
-        ...dayInfo, // Spreads in phase, dayOfWeek, category, sessionText, etc.
+        ...dayInfo,
         dateStr: dateKey,
         dateObject: currentDayDate,
-        status: 'Pending', // Default status for UI completion tracking
+        status: 'Pending', 
         proofImage: null
       };
     });
 
-    // 3. Save to Global State
     setAthleteMetadata(jsonData.metadata);
     setRawSchedule(jsonData.schedule);
     setStartDate(start.toISOString());
     setMappedPlan(newMappedPlan);
+
+    // Save the newly imported plan to the device
+    saveToStorage({
+      athleteMetadata: jsonData.metadata,
+      rawSchedule: jsonData.schedule,
+      startDate: start.toISOString(),
+      mappedPlan: newMappedPlan
+    });
   };
 
-  // Helper to mark a specific calendar date's session as complete
   const markSessionComplete = (dateKey, imageUri) => {
     setMappedPlan(prev => {
-      if (!prev[dateKey]) return prev;
-      return {
+      if (!prev || !prev[dateKey]) return prev;
+      
+      const updatedPlan = {
         ...prev,
         [dateKey]: {
           ...prev[dateKey],
@@ -68,15 +95,52 @@ export const UserProvider = ({ children }) => {
           proofImage: imageUri
         }
       };
+
+      // Save the updated status to the device
+      saveToStorage({
+        athleteMetadata,
+        rawSchedule,
+        startDate,
+        mappedPlan: updatedPlan
+      });
+
+      return updatedPlan;
     });
   };
 
-  // Helper to clear the plan (e.g., for uploading a new one)
-  const clearPlan = () => {
+  const toggleSessionComplete = (dateKey) => {
+    setMappedPlan(prev => {
+      if (!prev || !prev[dateKey]) return prev;
+      
+      const isCurrentlyComplete = prev[dateKey].status === 'Complete';
+      const updatedPlan = {
+        ...prev,
+        [dateKey]: {
+          ...prev[dateKey],
+          status: isCurrentlyComplete ? 'Pending' : 'Complete'
+        }
+      };
+
+      // Save the toggled status to the device instantly
+      saveToStorage({
+        athleteMetadata,
+        rawSchedule,
+        startDate,
+        mappedPlan: updatedPlan
+      });
+
+      return updatedPlan;
+    });
+  };
+
+  const clearPlan = async () => {
     setAthleteMetadata(null);
     setRawSchedule(null);
     setStartDate(null);
     setMappedPlan(null);
+    
+    // Wipe it from the hard drive
+    await AsyncStorage.removeItem(STORAGE_KEY);
   };
 
   return (
@@ -86,8 +150,10 @@ export const UserProvider = ({ children }) => {
       rawSchedule, 
       startDate, 
       mappedPlan, 
+      isRestoringData,
       importPlan,
       markSessionComplete,
+      toggleSessionComplete,
       clearPlan
     }}>
       {children}

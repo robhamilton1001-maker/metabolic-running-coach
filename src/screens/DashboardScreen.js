@@ -39,6 +39,10 @@ export default function DashboardScreen({ navigation }) {
   // Find out what week we are currently in to show a premium progress header
   const currentWeekNumber = selectedWorkout ? selectedWorkout.weekNumber : null;
   const currentPhase = selectedWorkout ? selectedWorkout.phase : "Out of Season";
+  // Calculate Live Progress
+  const totalSessions = Object.keys(mappedPlan).length;
+  const completedSessions = Object.values(mappedPlan).filter(day => day.status === 'Complete').length;
+  const progressPercent = totalSessions > 0 ? (completedSessions / totalSessions) * 100 : 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -53,6 +57,17 @@ export default function DashboardScreen({ navigation }) {
           <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.avatarButton}>
             <MaterialIcons name="person-outline" size={28} color={Colors.primary} />
           </TouchableOpacity>
+        </View>
+
+        {/* Live Progress Tracker */}
+        <View style={styles.progressContainer}>
+          <View style={styles.progressTextRow}>
+            <Text style={styles.progressLabel}>Macrocycle Completion</Text>
+            <Text style={styles.progressValue}>{Math.round(progressPercent)}%</Text>
+          </View>
+          <View style={styles.progressBarBackground}>
+            <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
+          </View>
         </View>
 
         {/* Macrocycle Context Pill */}
@@ -160,6 +175,13 @@ export default function DashboardScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   scrollContent: { paddingBottom: 60 },
+
+  progressContainer: { paddingHorizontal: 20, marginBottom: 24 },
+  progressTextRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  progressLabel: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
+  progressValue: { color: Colors.primary, fontSize: 14, fontWeight: 'bold' },
+  progressBarBackground: { height: 8, backgroundColor: Colors.surface, borderRadius: 4, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' },
+  progressBarFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 4 },
   
   // Header Styles
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginTop: 24, marginBottom: 16 },
@@ -205,4 +227,6 @@ const styles = StyleSheet.create({
   miniTileLeft: { flex: 1, marginRight: 16 },
   miniTileLabel: { fontSize: 12, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4, fontWeight: '600' },
   miniTileText: { fontSize: 16, color: Colors.textPrimary, fontWeight: '500' }
+
+  
 });
