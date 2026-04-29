@@ -1,15 +1,112 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import { useEffect, useState } from 'react';
+import { Alert, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Colors from '../constants/colors';
 import { useUser } from '../context/UserContext';
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
 export default function SettingsScreen({ navigation }) {
   const { clearPlan } = useUser();
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+
+  useEffect(() => {
+    const checkNotificationStatus = async () => {
+      const settings = await Notifications.getPermissionsAsync();
+      const isGranted = settings.granted || settings.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
+      
+      if (isGranted) {
+        const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+        setNotificationsEnabled(scheduled.length > 0);
+      }
+    };
+    checkNotificationStatus();
+  }, []);
+
+  const toggleNotifications = async (newValue) => {
+    if (newValue) {
+      try {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+        
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
+        
+        if (finalStatus !== 'granted') {
+          Alert.alert('Permission Denied', 'You need to enable notifications in your phone settings.');
+          return;
+        }
+
+        // REQUIRED FOR ANDROID: Create a Notification Channel
+        if (Platform.OS === 'android') {
+          await Notifications.setNotificationChannelAsync('default', {
+            name: 'Daily Reminders',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: Colors.primary,
+          });
+        }
+
+        // Schedule the daily 7:00 AM reminder
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: "Peak Oxygen",
+            body: "Good morning! Tap to view your scheduled training session for today.",
+            sound: true,
+          },
+          trigger: {
+            hour: 7,
+            minute: 0,
+            repeats: true,
+          },
+        });
+        
+        setNotificationsEnabled(true);
+        Alert.alert('Notifications Enabled', 'You will now receive a daily reminder at 7:00 AM.');
+
+      } catch (error) {
+        console.warn("Expo Go Notification Limitation:", error);
+        // Optimistically set it to true for UI testing purposes if Expo Go blocks the actual schedule
+        setNotificationsEnabled(true);
+        Alert.alert('Test Mode', 'Notifications are enabled in the UI, but may require a full app build to trigger on this device.');
+      }
+
+    } else {
+      try {
+        await Notifications.cancelAllScheduledNotificationsAsync();
+      } catch (error) {
+        console.warn("Failed to cancel notifications", error);
+      }
+      setNotificationsEnabled(false);
+    }
+  };
 
   const handleClearPlan = () => {
-    clearPlan();
-    navigation.replace('Onboarding');
+    Alert.alert(
+      "Delete Plan",
+      "Are you sure? This will wipe your 16-week macrocycle and all completed sessions.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
+          style: "destructive", 
+          onPress: () => {
+            clearPlan();
+            navigation.replace('Onboarding');
+          } 
+        }
+      ]
+    );
   };
 
   return (
@@ -26,13 +123,18 @@ export default function SettingsScreen({ navigation }) {
         
         <Text style={styles.sectionTitle}>Account</Text>
         <View style={styles.card}>
-          <TouchableOpacity style={styles.row}>
+          <View style={styles.row}>
             <View style={styles.rowLeft}>
               <MaterialIcons name="notifications-none" size={24} color={Colors.textSecondary} />
-              <Text style={styles.rowText}>Push Notifications</Text>
+              <Text style={styles.rowText}>Daily Reminders</Text>
             </View>
-            <MaterialIcons name="chevron-right" size={24} color={Colors.textSecondary} />
-          </TouchableOpacity>
+            <Switch 
+              value={notificationsEnabled} 
+              onValueChange={toggleNotifications}
+              trackColor={{ false: Colors.border, true: Colors.primary }}
+              thumbColor={notificationsEnabled ? '#000' : '#f4f3f4'}
+            />
+          </View>
         </View>
 
         <Text style={styles.sectionTitle}>Data Management</Text>
