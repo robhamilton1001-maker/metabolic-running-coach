@@ -55,7 +55,8 @@ export default function DashboardScreen({ navigation }) {
             <Text style={styles.athleteName}>{athleteMetadata?.athleteName || "Athlete"}</Text>
           </View>
           <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.avatarButton}>
-            <MaterialIcons name="person-outline" size={28} color={Colors.primary} />
+            {/* CHANGED ICON HERE */}
+            <MaterialIcons name="settings" size={26} color={Colors.primary} />
           </TouchableOpacity>
         </View>
 
