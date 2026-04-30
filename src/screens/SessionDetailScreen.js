@@ -1,13 +1,17 @@
+// NEW: Added React and useState import
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+// NEW: Added TextInput, KeyboardAvoidingView, and Platform to imports
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Colors from '../constants/colors';
 import { useUser } from '../context/UserContext';
 
 export default function SessionDetailScreen({ route, navigation }) {
   const { dayData } = route.params || {};
-  const { mappedPlan, markSessionComplete, toggleSessionComplete } = useUser();
+  // NEW: Added saveSessionNote to your destructured Context
+  const { mappedPlan, markSessionComplete, toggleSessionComplete, saveSessionNote } = useUser();
 
   if (!dayData) return null;
 
@@ -19,6 +23,9 @@ export default function SessionDetailScreen({ route, navigation }) {
 
   const currentDayData = liveDayData || dayData;
   const isComplete = currentDayData.status === 'Complete';
+
+  // NEW: Added local state to hold the text the athlete types
+  const [sessionNote, setSessionNote] = useState(currentDayData.sessionNote || "");
 
   const sessionParts = String(currentDayData.sessionText).split(' | ');
   const targetZone = sessionParts.length > 1 ? sessionParts[0] : currentDayData.category;
@@ -46,64 +53,94 @@ export default function SessionDetailScreen({ route, navigation }) {
     }
   };
 
+  // NEW: Added save handler for the note
+  const handleSaveNote = () => {
+    if (saveSessionNote && currentDayData.dateStr) {
+      saveSessionNote(currentDayData.dateStr, sessionNote);
+      alert("Note saved successfully!");
+    } else {
+      console.log("Please add a saveSessionNote function to your UserContext to permanently save this text.");
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <MaterialIcons name="close" size={28} color={Colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Day {currentDayData.dayNumber}</Text>
-          <View style={{ width: 28 }} />
-        </View>
-
-        <View style={styles.heroCard}>
-          <Text style={styles.phaseBadge}>{String(currentDayData.phase).toUpperCase()}</Text>
-          <Text style={styles.dayOfWeek}>{currentDayData.dayOfWeek}</Text>
-          <View style={styles.zoneContainer}>
-            <Text style={styles.zoneText(currentDayData.category)}>{targetZone}</Text>
-          </View>
-        </View>
-
-        <Text style={styles.sectionTitle}>Instructions</Text>
-        <View style={styles.instructionCard}>
-          <Text style={styles.instructionText}>{instruction}</Text>
-        </View>
-
-        {currentDayData.category !== 'Rest' && (
-          <>
-            {/* The Interactive Checkbox */}
-            <TouchableOpacity 
-              style={[styles.checkboxContainer, isComplete && styles.checkboxContainerActive]} 
-              onPress={handleToggle}
-            >
-              <MaterialIcons 
-                name={isComplete ? "check-box" : "check-box-outline-blank"} 
-                size={28} 
-                color={isComplete ? "#4CAF50" : Colors.textSecondary} 
-              />
-              <Text style={[styles.checkboxText, isComplete && styles.checkboxTextActive]}>
-                {isComplete ? "Session Completed" : "Mark as Complete"}
-              </Text>
+      {/* NEW: Wrapped in KeyboardAvoidingView so the keyboard doesn't cover the text box */}
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <MaterialIcons name="close" size={28} color={Colors.textPrimary} />
             </TouchableOpacity>
+            <Text style={styles.headerTitle}>Day {currentDayData.dayNumber}</Text>
+            <View style={{ width: 28 }} />
+          </View>
 
-            {/* Optional Photo Proof - Only appears AFTER checking the box */}
-            {isComplete && (
-              <View style={styles.proofContainer}>
-                {currentDayData.proofImage ? (
-                  <Image source={{ uri: currentDayData.proofImage }} style={styles.proofImage} />
-                ) : (
-                  <TouchableOpacity style={styles.logButton} onPress={handleLogActivity}>
-                    <MaterialIcons name="add-a-photo" size={20} color={Colors.primary} style={{ marginRight: 8 }} />
-                    <Text style={styles.logButtonText}>Upload Garmin/Strava Screenshot</Text>
+          <View style={styles.heroCard}>
+            <Text style={styles.phaseBadge}>{String(currentDayData.phase).toUpperCase()}</Text>
+            <Text style={styles.dayOfWeek}>{currentDayData.dayOfWeek}</Text>
+            <View style={styles.zoneContainer}>
+              <Text style={styles.zoneText(currentDayData.category)}>{targetZone}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.sectionTitle}>Instructions</Text>
+          <View style={styles.instructionCard}>
+            <Text style={styles.instructionText}>{instruction}</Text>
+          </View>
+
+          {currentDayData.category !== 'Rest' && (
+            <>
+              {/* The Interactive Checkbox */}
+              <TouchableOpacity 
+                style={[styles.checkboxContainer, isComplete && styles.checkboxContainerActive]} 
+                onPress={handleToggle}
+              >
+                <MaterialIcons 
+                  name={isComplete ? "check-box" : "check-box-outline-blank"} 
+                  size={28} 
+                  color={isComplete ? "#4CAF50" : Colors.textSecondary} 
+                />
+                <Text style={[styles.checkboxText, isComplete && styles.checkboxTextActive]}>
+                  {isComplete ? "Session Completed" : "Mark as Complete"}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Optional Photo Proof & Notes - Only appears AFTER checking the box */}
+              {isComplete && (
+                <View style={styles.proofContainer}>
+                  
+                  {/* --- NEW: SESSION NOTES UI --- */}
+                  <Text style={[styles.sectionTitle, { marginTop: 10 }]}>Session Notes</Text>
+                  <TextInput
+                    style={styles.notesInput}
+                    placeholder="e.g. HR drifted over 160bpm on the 4th interval. Felt heavy."
+                    placeholderTextColor={Colors.textSecondary}
+                    multiline={true}
+                    numberOfLines={4}
+                    value={sessionNote}
+                    onChangeText={setSessionNote}
+                  />
+                  <TouchableOpacity style={styles.saveNoteButton} onPress={handleSaveNote}>
+                    <Text style={styles.saveNoteButtonText}>Save Note</Text>
                   </TouchableOpacity>
-                )}
-              </View>
-            )}
-          </>
-        )}
-      </ScrollView>
+                  {/* --- END NEW SESSION NOTES UI --- */}
+
+                  {currentDayData.proofImage ? (
+                    <Image source={{ uri: currentDayData.proofImage }} style={styles.proofImage} />
+                  ) : (
+                    <TouchableOpacity style={styles.logButton} onPress={handleLogActivity}>
+                      <MaterialIcons name="add-a-photo" size={20} color={Colors.primary} style={{ marginRight: 8 }} />
+                      <Text style={styles.logButtonText}>Upload Garmin/Strava Screenshot</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -131,5 +168,10 @@ const styles = StyleSheet.create({
   proofContainer: { marginTop: 8 },
   logButton: { flexDirection: 'row', padding: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.primary, borderStyle: 'dashed' },
   logButtonText: { color: Colors.primary, fontSize: 15, fontWeight: 'bold' },
-  proofImage: { width: '100%', height: 220, borderRadius: 16, resizeMode: 'cover', borderWidth: 1, borderColor: Colors.border }
+  proofImage: { width: '100%', height: 220, borderRadius: 16, resizeMode: 'cover', borderWidth: 1, borderColor: Colors.border },
+
+  // NEW: Added styles for the notes section
+  notesInput: { backgroundColor: Colors.surface, color: Colors.textPrimary, borderRadius: 12, padding: 16, minHeight: 100, textAlignVertical: 'top', borderWidth: 1, borderColor: Colors.border, fontSize: 16, marginBottom: 12 },
+  saveNoteButton: { backgroundColor: Colors.primary, padding: 12, borderRadius: 12, alignItems: 'center', marginBottom: 32 },
+  saveNoteButtonText: { color: '#000', fontSize: 15, fontWeight: 'bold' }
 });

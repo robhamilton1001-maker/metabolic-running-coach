@@ -133,6 +133,26 @@ export const UserProvider = ({ children }) => {
     });
   };
 
+  const saveSessionNote = async (dateStr, noteText) => {
+    try {
+      const updatedPlan = { ...mappedPlan };
+      
+      // Check if the specific day exists in the plan
+      if (updatedPlan[dateStr]) {
+        // Add or update the sessionNote property for that day
+        updatedPlan[dateStr].sessionNote = noteText;
+        
+        // Update the live state
+        setMappedPlan(updatedPlan);
+        
+        // Save the whole updated plan back to the phone's local storage
+        await AsyncStorage.setItem('peakOxygenPlan', JSON.stringify(updatedPlan));
+      }
+    } catch (error) {
+      console.error("Error saving session note:", error);
+    }
+  };
+
   const clearPlan = async () => {
     setAthleteMetadata(null);
     setRawSchedule(null);
@@ -154,6 +174,7 @@ export const UserProvider = ({ children }) => {
       importPlan,
       markSessionComplete,
       toggleSessionComplete,
+      saveSessionNote,
       clearPlan
     }}>
       {children}
