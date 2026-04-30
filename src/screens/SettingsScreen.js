@@ -1,29 +1,31 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { useEffect, useState } from 'react';
-import { Alert, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Colors from '../constants/colors';
 import { useUser } from '../context/UserContext';
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async () => ({ shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: false }),
 });
+
+const UNITS = ['kph', 'mph', 'min/km', 'min/mile'];
 
 export default function SettingsScreen({ navigation }) {
   const { clearPlan } = useUser();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  
+  // Converter State
+  const [convInput, setConvInput] = useState('');
+  const [fromUnit, setFromUnit] = useState('min/km');
+  const [toUnit, setToUnit] = useState('mph');
+  const [convResult, setConvResult] = useState('--');
 
   useEffect(() => {
     const checkNotificationStatus = async () => {
       const settings = await Notifications.getPermissionsAsync();
-      const isGranted = settings.granted || settings.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
-      
-      if (isGranted) {
+      if (settings.granted || settings.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL) {
         const scheduled = await Notifications.getAllScheduledNotificationsAsync();
         setNotificationsEnabled(scheduled.length > 0);
       }
@@ -31,23 +33,61 @@ export default function SettingsScreen({ navigation }) {
     checkNotificationStatus();
   }, []);
 
+  // Run conversion math whenever inputs change
+  useEffect(() => {
+    if (!convInput) {
+      setConvResult('--');
+      return;
+    }
+
+    const parseInput = (val) => {
+      if (val.includes(':')) {
+        const [min, sec] = val.split(':');
+        return parseInt(min || 0) + parseInt(sec || 0) / 60;
+      }
+      return parseFloat(val);
+    };
+
+    const formatPace = (decimal) => {
+      if (!isFinite(decimal) || decimal <= 0) return '--';
+      const mins = Math.floor(decimal);
+      const secs = Math.round((decimal - mins) * 60);
+      return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    };
+
+    const num = parseInput(convInput.replace(',', '.'));
+    if (!num || isNaN(num)) return;
+
+    // Convert everything to a baseline of KPH
+    let kph = 0;
+    if (fromUnit === 'kph') kph = num;
+    if (fromUnit === 'mph') kph = num * 1.60934;
+    if (fromUnit === 'min/km') kph = 60 / num;
+    if (fromUnit === 'min/mile') kph = 60 / (num / 1.60934);
+
+    // Convert KPH to target unit
+    let result = '';
+    if (toUnit === 'kph') result = kph.toFixed(2) + ' kph';
+    if (toUnit === 'mph') result = (kph / 1.60934).toFixed(2) + ' mph';
+    if (toUnit === 'min/km') result = formatPace(60 / kph) + ' /km';
+    if (toUnit === 'min/mile') result = formatPace((60 / kph) * 1.60934) + ' /mi';
+
+    setConvResult(result);
+  }, [convInput, fromUnit, toUnit]);
+
   const toggleNotifications = async (newValue) => {
     if (newValue) {
       try {
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
         let finalStatus = existingStatus;
-        
         if (existingStatus !== 'granted') {
           const { status } = await Notifications.requestPermissionsAsync();
           finalStatus = status;
         }
-        
         if (finalStatus !== 'granted') {
-          Alert.alert('Permission Denied', 'You need to enable notifications in your phone settings.');
+          Alert.alert('Permission Denied', 'Enable notifications in your phone settings.');
           return;
         }
-
-        // REQUIRED FOR ANDROID: Create a Notification Channel
         if (Platform.OS === 'android') {
           await Notifications.setNotificationChannelAsync('default', {
             name: 'Daily Reminders',
@@ -56,58 +96,28 @@ export default function SettingsScreen({ navigation }) {
             lightColor: Colors.primary,
           });
         }
-
-        // Schedule the daily 7:00 AM reminder
         await Notifications.scheduleNotificationAsync({
-          content: {
-            title: "Peak Oxygen",
-            body: "Good morning! Tap to view your scheduled training session for today.",
-            sound: true,
-          },
-          trigger: {
-            hour: 7,
-            minute: 0,
-            repeats: true,
-          },
+          content: { title: "Peak Oxygen", body: "Good morning! Tap to view your scheduled training session for today.", sound: true },
+          trigger: { hour: 7, minute: 0, repeats: true },
         });
-        
         setNotificationsEnabled(true);
-        Alert.alert('Notifications Enabled', 'You will now receive a daily reminder at 7:00 AM.');
-
       } catch (error) {
-        console.warn("Expo Go Notification Limitation:", error);
-        // Optimistically set it to true for UI testing purposes if Expo Go blocks the actual schedule
-        setNotificationsEnabled(true);
-        Alert.alert('Test Mode', 'Notifications are enabled in the UI, but may require a full app build to trigger on this device.');
+        setNotificationsEnabled(true); // Fallback for Expo Go UI testing
       }
-
     } else {
-      try {
-        await Notifications.cancelAllScheduledNotificationsAsync();
-      } catch (error) {
-        console.warn("Failed to cancel notifications", error);
-      }
+      await Notifications.cancelAllScheduledNotificationsAsync();
       setNotificationsEnabled(false);
     }
   };
 
-  const handleClearPlan = () => {
-    Alert.alert(
-      "Delete Plan",
-      "Are you sure? This will wipe your 16-week macrocycle and all completed sessions.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive", 
-          onPress: () => {
-            clearPlan();
-            navigation.replace('Onboarding');
-          } 
-        }
-      ]
-    );
-  };
+  const UnitPill = ({ unit, active, onPress }) => (
+    <TouchableOpacity 
+      style={[styles.unitPill, active && styles.unitPillActive]} 
+      onPress={onPress}
+    >
+      <Text style={[styles.unitPillText, active && styles.unitPillTextActive]}>{unit}</Text>
+    </TouchableOpacity>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -119,8 +129,42 @@ export default function SettingsScreen({ navigation }) {
         <View style={{ width: 28 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
+        {/* CONVERTER SECTION */}
+        <Text style={styles.sectionTitle}>Pace & Speed Converter</Text>
+        <View style={[styles.card, { padding: 16 }]}>
+          <Text style={styles.converterLabel}>From:</Text>
+          <View style={styles.pillContainer}>
+            {UNITS.map(u => (
+              <UnitPill key={`from-${u}`} unit={u} active={fromUnit === u} onPress={() => setFromUnit(u)} />
+            ))}
+          </View>
+
+          <Text style={styles.converterLabel}>To:</Text>
+          <View style={styles.pillContainer}>
+            {UNITS.map(u => (
+              <UnitPill key={`to-${u}`} unit={u} active={toUnit === u} onPress={() => setToUnit(u)} />
+            ))}
+          </View>
+
+          <View style={styles.converterInputRow}>
+            <TextInput 
+              style={styles.converterInput}
+              placeholder="e.g. 5:30 or 12.5"
+              placeholderTextColor={Colors.textSecondary}
+              keyboardType="numbers-and-punctuation"
+              value={convInput}
+              onChangeText={setConvInput}
+            />
+            <MaterialIcons name="arrow-forward" size={24} color={Colors.textSecondary} style={{ marginHorizontal: 12 }} />
+            <View style={styles.converterResultBox}>
+              <Text style={styles.converterResultText}>{convResult}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ACCOUNT SECTION */}
         <Text style={styles.sectionTitle}>Account</Text>
         <View style={styles.card}>
           <View style={styles.row}>
@@ -137,9 +181,10 @@ export default function SettingsScreen({ navigation }) {
           </View>
         </View>
 
+        {/* DATA MANAGEMENT SECTION */}
         <Text style={styles.sectionTitle}>Data Management</Text>
         <View style={styles.card}>
-          <TouchableOpacity style={styles.row} onPress={handleClearPlan}>
+          <TouchableOpacity style={styles.row} onPress={() => Alert.alert("Delete Plan", "Are you sure? This wipes all data.", [{text: "Cancel", style: "cancel"}, {text: "Delete", style: "destructive", onPress: () => { clearPlan(); navigation.replace('Onboarding'); }}])}>
             <View style={styles.rowLeft}>
               <MaterialIcons name="delete-outline" size={24} color="#ff5252" />
               <Text style={[styles.rowText, { color: '#ff5252' }]}>Delete Plan & Data</Text>
@@ -148,7 +193,7 @@ export default function SettingsScreen({ navigation }) {
         </View>
 
         <Text style={styles.versionText}>Peak Oxygen v1.0.0</Text>
-
+        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -165,5 +210,17 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
   rowLeft: { flexDirection: 'row', alignItems: 'center' },
   rowText: { fontSize: 16, color: Colors.textPrimary, marginLeft: 16, fontWeight: '500' },
-  versionText: { textAlign: 'center', color: Colors.textSecondary, fontSize: 12, marginTop: 20 }
+  versionText: { textAlign: 'center', color: Colors.textSecondary, fontSize: 12, marginTop: 10 },
+  
+  // Converter Styles
+  converterLabel: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600', marginBottom: 8 },
+  pillContainer: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16, gap: 8 },
+  unitPill: { backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12 },
+  unitPillActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  unitPillText: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  unitPillTextActive: { color: '#000', fontWeight: '700' },
+  converterInputRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+  converterInput: { flex: 1, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, borderRadius: 12, padding: 12, color: Colors.textPrimary, fontSize: 16, fontWeight: '500' },
+  converterResultBox: { flex: 1, backgroundColor: Colors.border, borderRadius: 12, padding: 12, alignItems: 'center', justifyContent: 'center' },
+  converterResultText: { color: Colors.textPrimary, fontSize: 16, fontWeight: '700' }
 });

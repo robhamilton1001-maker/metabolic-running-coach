@@ -44,6 +44,13 @@ export default function DashboardScreen({ navigation }) {
   const completedSessions = Object.values(mappedPlan).filter(day => day.status === 'Complete').length;
   const progressPercent = totalSessions > 0 ? (completedSessions / totalSessions) * 100 : 0;
 
+  const getGreeting = () => {
+    const currentHour = new Date().getHours();
+    if (currentHour < 12) return 'Good Morning,';
+    if (currentHour < 18) return 'Good Afternoon,';
+    return 'Good Evening,';
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -51,7 +58,7 @@ export default function DashboardScreen({ navigation }) {
         {/* Premium Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Good Morning,</Text>
+            <Text style={styles.greeting}>{getGreeting()}</Text>
             <Text style={styles.athleteName}>{athleteMetadata?.athleteName || "Athlete"}</Text>
           </View>
           <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.avatarButton}>
