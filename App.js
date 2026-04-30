@@ -10,12 +10,9 @@ import AppLoading from './src/components/AppLoading';
 // Import Screens
 import DashboardScreen from './src/screens/DashboardScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
-import PdfViewerScreen from './src/screens/PdfViewerScreen';
-import PlaceholderScreen from './src/screens/PlaceholderScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import SessionDetailScreen from './src/screens/SessionDetailScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
-import StatisticsScreen from './src/screens/StatisticsScreen';
 import TrainingPlanScreen from './src/screens/TrainingPlanScreen';
 import WeekDetailScreen from './src/screens/WeekDetailScreen';
 
@@ -125,28 +122,14 @@ export default function App() {
             component={SessionDetailScreen} 
             options={{ headerShown: false, presentation: 'modal' }} 
           />
-
-          {/* Modals */}
-          <Stack.Screen 
-            name="Placeholder" 
-            component={PlaceholderScreen} 
-            options={{ headerShown: false, presentation: 'modal' }} 
-          />
+          
           <Stack.Screen 
             name="Settings" 
             component={SettingsScreen} 
             options={{ headerShown: false, presentation: 'modal' }} 
           />
-          <Stack.Screen 
-            name="Statistics" 
-            component={StatisticsScreen} 
-            options={{ headerShown: false, presentation: 'modal' }} 
-          />
-          <Stack.Screen 
-  name="PdfViewer" 
-  component={PdfViewerScreen} 
-  options={{ headerShown: false, presentation: 'modal' }} 
-/>
+          
+      
         </Stack.Navigator>
       </NavigationContainer>
       </SafeAreaProvider>
