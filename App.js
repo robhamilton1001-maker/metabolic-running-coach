@@ -3,11 +3,10 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { DarkTheme, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import AppLoading from './src/components/AppLoading';
 
 // Import Screens
+import AppLoading from './src/components/AppLoading';
 import DashboardScreen from './src/screens/DashboardScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
@@ -82,33 +81,23 @@ function MainTabs() {
 }
 
 export default function App() {
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 2500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (isLoading) {
-    return <AppLoading />;
-  }
-
   return (
+    
     <UserProvider>
       <SafeAreaProvider>
       {/* 3. Pass the Dark Theme */}
       <NavigationContainer theme={NavTheme}>
         <StatusBar style="light" />
         <Stack.Navigator 
-          screenOptions={{ 
+          initialRouteName="AppLoading"
+          screenOptions={{
             headerStyle: { backgroundColor: Colors.background },
             headerTintColor: Colors.primary,
             contentStyle: { backgroundColor: Colors.background },
             headerShown: false 
           }}
         >
+          <Stack.Screen name="AppLoading" component={AppLoading} />
           <Stack.Screen name="Onboarding" component={OnboardingScreen} />
           <Stack.Screen name="Dashboard" component={MainTabs} /> 
           

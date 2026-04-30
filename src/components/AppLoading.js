@@ -10,6 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import Colors from '../constants/colors';
+import { useUser } from '../context/UserContext';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
@@ -38,16 +39,28 @@ const LOGO_PATHS = [
   "M660.643677,580.989136 C660.644836,564.831543 660.768860,549.170227 660.568970,533.513062 C660.512634,529.101074 662.085938,527.730103 666.388245,527.769165 C675.950317,527.855896 675.944763,527.671631 675.948486,537.305542 C675.955139,554.464539 675.978821,571.623596 675.979980,588.782593 C675.980469,595.702942 675.684204,595.989319 668.586060,595.885437 C666.111206,595.849304 663.607605,595.900757 660.643799,594.660461 C660.643799,590.395874 660.643799,585.941467 660.643677,580.989136 z"
 ];
 
-export default function AppLoading() {
+export default function AppLoading({ navigation }) { // <-- Add navigation here
   const progress = useSharedValue(0);
+  const { mappedPlan } = useUser() || {}; // <-- Add this (with the safe fallback!)
 
   useEffect(() => {
-    // Run animation over 2000ms, leaving ~500ms of "steady state" before the app loads
+    // 1. Run the animation
     progress.value = withTiming(1, { 
         duration: 2000, 
-        easing: Easing.bezier(0.25, 0.1, 0.25, 1), // Smooth cubic-bezier for premium feel
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1), 
     });
-  }, []);
+
+    // 2. Wait 2.5 seconds, then check data and route
+    const timer = setTimeout(() => {
+      if (mappedPlan && Object.keys(mappedPlan).length > 0) {
+        navigation.replace('Dashboard');
+      } else {
+        navigation.replace('Onboarding');
+      }
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, [mappedPlan, navigation, progress]);
 
   const animatedPathProps = useAnimatedProps(() => {
     // Use 800 for path length (closer to user's 696) to prevent "fast forwarding" effect
