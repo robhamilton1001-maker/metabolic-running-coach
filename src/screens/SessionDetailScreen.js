@@ -27,9 +27,8 @@ export default function SessionDetailScreen({ route, navigation }) {
   // NEW: Added local state to hold the text the athlete types
   const [sessionNote, setSessionNote] = useState(currentDayData.sessionNote || "");
 
-  const sessionParts = String(currentDayData.sessionText).split(' | ');
-  const targetZone = sessionParts.length > 1 ? sessionParts[0] : currentDayData.category;
-  const instruction = sessionParts.length > 1 ? sessionParts.slice(1).join(' | ') : currentDayData.sessionText;
+  const targetZone = currentDayData.category;
+  const instruction = currentDayData.sessionText;
 
   const handleLogActivity = async () => {
     try {
@@ -154,11 +153,25 @@ const styles = StyleSheet.create({
   heroCard: { alignItems: 'center', marginBottom: 40 },
   phaseBadge: { color: Colors.textSecondary, fontSize: 14, fontWeight: 'bold', letterSpacing: 2, marginBottom: 8 },
   dayOfWeek: { fontSize: 32, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 16 },
-  zoneContainer: { backgroundColor: Colors.surface, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, borderWidth: 1, borderColor: Colors.border },
-  zoneText: (category) => ({ fontSize: 18, fontWeight: 'bold', color: category === 'Rest' ? '#4CAF50' : Colors.primary }),
+  zoneContainer: { backgroundColor: Colors.surface, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, borderWidth: 1, borderColor: Colors.border, maxWidth: '100%' },
+  zoneText: (category) => ({ fontSize: 18, fontWeight: 'bold', color: category === 'Rest' ? '#4CAF50' : Colors.primary, textAlign: 'center', flexShrink: 1 }),
   sectionTitle: { fontSize: 18, fontWeight: '600', color: Colors.textPrimary, marginBottom: 12 },
-  instructionCard: { backgroundColor: Colors.surface, padding: 24, borderRadius: 16, borderWidth: 1, borderColor: Colors.border, marginBottom: 32 },
-  instructionText: { fontSize: 22, color: Colors.textPrimary, lineHeight: 32, fontWeight: '500' },
+  instructionCard: { 
+    backgroundColor: Colors.surface, 
+    padding: 24, 
+    borderRadius: 16, 
+    borderWidth: 1, 
+    borderColor: Colors.border, 
+    marginBottom: 32,
+    width: '100%', // <-- 1. Forces the card to never exceed the screen width
+  },
+  instructionText: { 
+    fontSize: 22, 
+    color: Colors.textPrimary, 
+    lineHeight: 32, 
+    fontWeight: '500',
+    flexShrink: 1, // <-- 2. Forces the text to wrap downward instead of pushing sideways
+  },
   
   checkboxContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, padding: 20, borderRadius: 16, borderWidth: 1, borderColor: Colors.border, marginBottom: 20 },
   checkboxContainerActive: { borderColor: '#4CAF50', backgroundColor: 'rgba(76, 175, 80, 0.05)' },
