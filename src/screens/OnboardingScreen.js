@@ -23,7 +23,7 @@ export default function OnboardingScreen({ navigation }) {
   }, [isRestoringData, mappedPlan]);
 
   // Check if the currently selected date is a Monday (0 = Sunday, 1 = Monday)
-  const isMonday = startDate.getDay() === 1;
+  const isMonday = startDate.getUTCDay() === 1;
 
   const onChangeDate = (event, selectedDate) => {
     const currentDate = selectedDate || startDate;

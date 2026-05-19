@@ -50,7 +50,7 @@ export const UserProvider = ({ children }) => {
     }
 
     const start = new Date(selectedStartDateStr);
-    if (start.getDay() !== 1) throw new Error("Start date must be a Monday");
+    if (start.getUTCDay() !== 1) throw new Error("Start date must be a Monday");
 
     const newMappedPlan = {};
 
