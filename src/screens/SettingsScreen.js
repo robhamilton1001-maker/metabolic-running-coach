@@ -348,8 +348,10 @@ export default function SettingsScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.versionText}>Peak Oxygen v1.0.0</Text>
+        <Text style={styles.versionText}>Peak Oxygen v1.0.1</Text>
         <View style={{ height: 40 }} />
+
+        
       </ScrollView>
     </SafeAreaView>
   );
